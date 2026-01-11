@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // <--- FIX: Import Inter correctly
+import { Inter } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
 
-// Initialize the font
+// Use 'Inter' for that clean SaaS look
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "WatchThisMovie - AI Recommender",
+  title: "WatchThisMovie.online - Premium Movie AI",
   description: "Stop scrolling, start watching.",
+  icons: {
+    icon: "/wtm.svg",
+  },
 };
 
 export default function RootLayout({
@@ -17,13 +21,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Navbar /> 
-        {/* Padding top is crucial so content doesn't hide behind the fixed Navbar */}
-        <div className="pt-16"> 
+    <html lang="en" className="dark scroll-smooth">
+      <body className={`${inter.className} bg-black text-white antialiased`}>
+        {/* GLOBAL NOISE TEXTURE (The Secret Sauce for Premium Feel) */}
+        <div className="fixed inset-0 z-[-1] opacity-[0.03] pointer-events-none bg-[url('https://grainy-gradients.vercel.app/noise.svg')] mix-blend-overlay"></div>
+        
+        {/* GLOBAL GRADIENT BLURS */}
+        <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full z-[-1]" />
+        <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-900/10 blur-[120px] rounded-full z-[-1]" />
+
+        <Navigation />
+        
+        {/* Content wrapper with minimum height to push footer down */}
+        <main className="min-h-screen pt-20 flex flex-col">
           {children}
-        </div>
+        </main>
+
+        <Footer />
       </body>
     </html>
   );
