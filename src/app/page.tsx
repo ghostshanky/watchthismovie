@@ -1,79 +1,202 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabaseClient'; // <--- NEW IMPORT
-import { Movie } from './types';
 import Link from 'next/link';
+import Image from 'next/image';
+import { Sparkles, Shield, Zap, ArrowRight, PlayCircle, CheckCircle, Film } from 'lucide-react';
+import { fetchTrendingMovies } from './actions';
+import { Movie } from './types';
 
-export default function Home() {
-  const [movie, setMovie] = useState<Movie | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Initialize the connection
-  const supabase = createClient();
-
-  useEffect(() => {
-    async function fetchTrendingMovie() {
-      try {
-        const res = await fetch(
-          `https://api.themoviedb.org/3/trending/movie/day?api_key=${process.env.NEXT_PUBLIC_TMDB_KEY}`
-        );
-        const data = await res.json();
-        const randomIndex = Math.floor(Math.random() * data.results.length);
-        setMovie(data.results[randomIndex]);
-      } catch (error) {
-        console.error("Failed to fetch movies:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchTrendingMovie();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-black">
-        <div className="animate-pulse text-2xl text-blue-500 font-mono">
-          INITIALIZING CINEMA AI...
-        </div>
-      </div>
-    );
-  }
-
-  if (!movie) return <div className="text-white text-center mt-20">System Error. Retry.</div>;
+export default async function LandingPage() {
+  // 1. Get the #1 Trending Movie for the background
+  const trending = await fetchTrendingMovies() as unknown as Movie[];
+  const heroMovie = trending[0]; 
 
   return (
-    <main className="relative h-screen w-screen overflow-hidden bg-black">
-      <div
-        className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
-        style={{
-          backgroundImage: `url(https://image.tmdb.org/t/p/original${movie.backdrop_path})`,
-          opacity: 0.6
-        }}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+    // FIX: Added overflow-x-hidden to prevent right-side white bars
+    <div className="min-h-screen w-full bg-black text-white selection:bg-blue-500/30 overflow-x-hidden">
+      
+      {/* =========================================
+          HERO SECTION
+         ========================================= */}
+      <section className="relative h-screen w-full flex flex-col justify-center">
+        
+        {/* A. The Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image 
+            src={`https://image.tmdb.org/t/p/original${heroMovie?.backdrop_path}`}
+            alt="Hero Background"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Gradient Overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/60 to-black" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
+        </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center h-full px-4 text-center">
-        <h1 className="text-5xl md:text-7xl font-extrabold text-white tracking-tight mb-6 drop-shadow-2xl">
-          Stop Scrolling. <span className="text-blue-500">Start Watching.</span>
-        </h1>
+        {/* B. The Content */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 pt-20">
+          
+          {/* Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-widest mb-6 animate-in slide-in-from-left-4">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+            Trending #1 Worldwide
+          </div>
 
-        <p className="max-w-2xl text-lg md:text-2xl text-gray-200 mb-8 font-light leading-relaxed">
-          {movie.title} is trending today. But is it right for <i>you</i>?
-          <br />
-          <span className="text-sm text-gray-400 mt-2 block">
-            Let our AI scan your taste DNA to find out.
-          </span>
-        </p>
+          {/* Headline */}
+          <h1 className="text-4xl md:text-7xl font-bold leading-tight mb-6 max-w-4xl shadow-black drop-shadow-lg">
+            <span className="text-blue-400 italic font-serif block mb-2">{heroMovie?.title}</span>
+            is trending today. <br />
+            <span className="text-white">But is it right for <span className="underline decoration-blue-500 underline-offset-8">you</span>?</span>
+          </h1>
 
-        <Link
-          href="/login"
-          className="group relative px-8 py-4 bg-white text-black font-bold text-lg rounded-full overflow-hidden transition-transform hover:scale-105 active:scale-95 inline-block"
-        >
-          <span className="relative z-10">Find My Perfect Movie</span>
-          <div className="absolute inset-0 bg-blue-400 opacity-0 group-hover:opacity-20 transition-opacity" />
-        </Link>
+          <p className="text-gray-200 text-lg md:text-xl max-w-xl mb-10 leading-relaxed drop-shadow-md font-medium">
+            Don&apos;t trust the average rating. Our AI analyzes your psychology to predict your exact match score before you press play.
+          </p>
 
-      </div>
-    </main>
+          {/* Action Buttons */}
+          <div className="flex flex-col md:flex-row gap-4 max-w-lg">
+            <Link 
+              href="/login"
+              className="px-8 py-4 bg-white text-black font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_-5px_rgba(255,255,255,0.4)]"
+            >
+              Check My Match Score <ArrowRight className="w-5 h-5" />
+            </Link>
+            
+            {/* FIX: Working Trailer Button (Opens YouTube) */}
+            <a 
+              href={`https://www.youtube.com/results?search_query=${heroMovie?.title}+trailer`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 bg-black/40 backdrop-blur-md border border-white/20 text-white font-bold text-lg rounded-full hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <PlayCircle className="w-5 h-5" /> Watch Trailer
+            </a>
+          </div>
+
+          {/* Movie Metadata Tags */}
+          <div className="mt-12 flex flex-wrap items-center gap-4 text-xs md:text-sm font-bold text-gray-300">
+             <div className="px-3 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded backdrop-blur-sm">
+               IMDb {heroMovie?.vote_average?.toFixed(1)}
+             </div>
+             <div className="px-3 py-1 bg-white/10 border border-white/10 rounded backdrop-blur-sm">
+               {heroMovie?.release_date?.split('-')[0]}
+             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================
+          SOCIAL PROOF
+         ========================================= */}
+      <section className="py-10 border-y border-white/5 bg-white/[0.02]">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">
+            Aggregating data from
+          </p>
+          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
+            <span className="text-xl font-bold font-serif tracking-tighter">IMDb</span>
+            <span className="text-xl font-black font-sans tracking-wide">TMDB</span>
+            <span className="text-xl font-bold font-mono">ROTTEN TOMATOES</span>
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================
+          BENTO GRID FEATURES
+         ========================================= */}
+      <section className="py-24 px-6 bg-black relative">
+        <div className="absolute top-1/2 left-0 w-[500px] h-[500px] bg-blue-900/10 blur-[120px] rounded-full pointer-events-none" />
+        
+        <div className="max-w-7xl mx-auto">
+          
+          {/* HEADER WITH THE QUOTE */}
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-200 to-white">
+              &quot;Life is too short for <br className="hidden md:block" /> bad movies.&quot;
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto text-lg leading-relaxed">
+              We stripped away the ads, the tracking, and the clutter. What&apos;s left is the purest way to find cinema that actually moves you.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* 1. Large AI Card */}
+            <div className="col-span-1 md:col-span-2 bg-gradient-to-br from-gray-900 to-black border border-white/10 rounded-3xl p-8 md:p-12 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-purple-600/10 blur-[80px] rounded-full group-hover:bg-purple-600/20 transition-colors" />
+              <div className="relative z-10">
+                <div className="w-12 h-12 bg-purple-500/20 rounded-xl flex items-center justify-center mb-6 text-purple-400">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="text-2xl md:text-3xl font-bold mb-4">It reads your mind.</h3>
+                <p className="text-gray-400 text-lg max-w-md">
+                  We don&apos;t just recommend &quot;Action.&quot; We analyze mood, pacing, cinematography, and plot complexity to find matches that resonate with your personality.
+                </p>
+              </div>
+            </div>
+
+            {/* 2. Speed Card */}
+            <div className="bg-gray-900/50 border border-white/10 rounded-3xl p-8 relative overflow-hidden group hover:border-blue-500/30 transition-colors">
+              <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center mb-6 text-blue-400">
+                <Zap className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Lightning Fast.</h3>
+              <p className="text-gray-400 text-sm">
+                Get a curated list of 20 movies in under 1.2 seconds. No scrolling paralysis.
+              </p>
+            </div>
+
+            {/* 3. Privacy Card */}
+            <div className="bg-gray-900/50 border border-white/10 rounded-3xl p-8 relative overflow-hidden group hover:border-green-500/30 transition-colors">
+               <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center mb-6 text-green-400">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Privacy First.</h3>
+                <p className="text-gray-400 text-sm">
+                  You are the customer, not the product. We never sell your viewing data to advertisers.
+                </p>
+            </div>
+
+            {/* 4. Wide Feature List */}
+            <div className="col-span-1 md:col-span-2 bg-white/[0.03] border border-white/10 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 space-y-6">
+                <h3 className="text-2xl font-bold">Curated by Humans & AI.</h3>
+                <ul className="space-y-4">
+                  <li className="flex items-center gap-3 text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    <span>Filter by Streaming Service (Netflix, Prime)</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-gray-300">
+                    <CheckCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                    <span>Exclude genres you hate (e.g., Horror)</span>
+                  </li>
+                </ul>
+              </div>
+              <div className="flex-1 w-full h-40 bg-black/50 rounded-xl border border-white/10 flex items-center justify-center relative overflow-hidden">
+                 <Film className="w-10 h-10 text-gray-700" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* 5. FINAL CALL TO ACTION */}
+      <section className="py-32 px-6 text-center bg-gradient-to-b from-black to-gray-900">
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-bold mb-8">Ready to watch something good?</h2>
+          <Link 
+            href="/login"
+            className="inline-block px-12 py-5 bg-white text-black font-bold text-xl rounded-full hover:bg-gray-200 hover:scale-105 transition-all shadow-xl shadow-white/10"
+          >
+            Start Curating Now
+          </Link>
+          <p className="mt-6 text-sm text-gray-500">Free forever. No credit card required.</p>
+        </div>
+      </section>
+
+    </div>
   );
 }

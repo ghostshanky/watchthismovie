@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
-:root {
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Fixes the right-side white bar */
+  background: black; /* Fixes the top white bar if loading */
+  width: 100%;
+}:root {
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -19,8 +29,3 @@
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}

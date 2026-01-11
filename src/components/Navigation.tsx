@@ -82,29 +82,29 @@ export default function Navigation() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled || mobileMenuOpen
-            ? 'bg-black/90 backdrop-blur-xl border-b border-white/10'
-            : 'bg-gradient-to-b from-black/80 to-transparent'
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${isScrolled || mobileMenuOpen
+            ? 'bg-black/60 backdrop-blur-xl border-white/10' // Heavy glass on scroll
+            : 'bg-black/30 backdrop-blur-md border-white/5'  // Light glass at top (Fixed)
           }`}
       >
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-  
-            {/* LOGO */}
-<Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 flex-shrink-0">
-  {/* Custom SVG Logo */}
-  <div className="w-10 h-10 relative">
-     <Image 
-       src="/wtm.svg" 
-       alt="WatchThisMovie" 
-       fill
-       className="object-contain rounded"
-       priority
-     />
-  </div>
-  <span className="hidden md:block font-bold text-white tracking-tight">WatchThisMovie</span>
-</Link>
-  
-            {/* IF LOGGED IN: SHOW SEARCH & MENU */}
+
+          {/* LOGO */}
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 flex-shrink-0">
+            {/* Custom SVG Logo */}
+            <div className="w-10 h-10 relative">
+              <Image
+                src="/wtm.svg"
+                alt="WatchThisMovie"
+                fill
+                className="object-contain rounded"
+                priority
+              />
+            </div>
+            <span className="hidden md:block font-bold text-white tracking-tight">WatchThisMovie</span>
+          </Link>
+
+          {/* IF LOGGED IN: SHOW SEARCH & MENU */}
           {user ? (
             <>
               {/* SEARCH BAR */}
