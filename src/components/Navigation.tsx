@@ -1,52 +1,68 @@
 'use client';
+
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Search, Bell, Menu, X, LogOut, Film, Settings, AlertTriangle } from 'lucide-react';
-import { createClient } from '@/lib/supabaseClient';
-import { useState, useEffect, useRef } from 'react';
-import { searchMovies } from '@/app/actions';
 import Image from 'next/image';
-import { Movie } from '@/app/types';
-// FIX: Import the strictly defined User type from Supabase
+import { useState, useEffect, useRef } from 'react';
+import { createClient } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
+import { searchMovies } from '@/app/actions';
+import { Movie } from '@/app/types'; // Ensure you have this type or remove generic if needed
+import { 
+  Search, 
+  Menu, 
+  X, 
+  LogOut, 
+  Film, 
+  Settings, 
+  AlertTriangle, 
+  User as UserIcon 
+} from 'lucide-react';
 
 export default function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
 
-  // State
+  // --- STATE ---
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
-
-  // FIX: Explicitly type the user state
   const [user, setUser] = useState<User | null>(null);
-  const [showSignOutModal, setShowSignOutModal] = useState(false); // <--- NEW STATE
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
 
-  // Check Session on Mount
+  // --- EFFECTS ---
+
+  // 1. Get User Session
   useEffect(() => {
     const getUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
     };
     getUser();
-  }, []);
 
-  // Scroll Listener
+    // Listen for Auth Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
+
+  // 2. Scroll & Click Outside
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', handleScroll);
-
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setProfileOpen(false);
       }
     };
+
+    window.addEventListener('scroll', handleScroll);
     document.addEventListener('mousedown', handleClickOutside);
 
     return () => {
@@ -55,129 +71,155 @@ export default function Navigation() {
     };
   }, []);
 
-  // Search Logic
+  // 3. Live Search Logic
   useEffect(() => {
     const timer = setTimeout(async () => {
       if (searchQuery.length > 2) {
-        // We cast this safely because we know the shape matches our Movie interface
+        // Safe Cast
         const results = await searchMovies(searchQuery) as unknown as Movie[];
         setSearchResults(results);
       } else {
         setSearchResults([]);
       }
-    }, 500);
+    }, 500); // 500ms debounce
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
   const confirmSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    router.push('/');
+    router.push('/login');
     setShowSignOutModal(false);
   };
 
-  // Hiding logic: Don't show on /login page
+  // Helper for active link styles
+  const isActive = (path: string) => pathname === path ? "text-white font-bold" : "text-gray-400 hover:text-white transition-colors";
+
+  // Hide on login page
   if (pathname === '/login') return null;
 
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${isScrolled || mobileMenuOpen
-            ? 'bg-black/60 backdrop-blur-xl border-white/10' // Heavy glass on scroll
-            : 'bg-black/30 backdrop-blur-md border-white/5'  // Light glass at top (Fixed)
-          }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
+          isScrolled || mobileMenuOpen
+            ? 'bg-black/80 backdrop-blur-xl border-white/10' 
+            : 'bg-gradient-to-b from-black/80 to-transparent border-transparent'
+        }`}
       >
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
 
-          {/* LOGO */}
-          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 flex-shrink-0">
-            {/* Custom SVG Logo */}
-            <div className="w-10 h-10 relative">
+          {/* 1. LOGO (Left) */}
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2 flex-shrink-0 group">
+            <div className="w-10 h-10 relative transition-transform group-hover:scale-110">
               <Image
                 src="/wtm.svg"
                 alt="WatchThisMovie"
                 fill
-                className="object-contain rounded"
+                className="object-contain"
                 priority
               />
             </div>
-            <span className="hidden md:block font-bold text-white tracking-tight">WatchThisMovie</span>
+            <span className="hidden md:block font-bold text-white tracking-tight text-lg">WatchThisMovie</span>
           </Link>
 
-          {/* IF LOGGED IN: SHOW SEARCH & MENU */}
-          {user ? (
-            <>
-              {/* SEARCH BAR */}
-              <div className="flex-1 max-w-xl relative hidden md:block group">
-                <div className="relative flex items-center">
-                  <Search className="absolute left-3 w-4 h-4 text-gray-400 group-focus-within:text-white transition-colors" />
-                  <input
-                    type="text"
-                    placeholder="Search titles..."
-                    className="w-full bg-black/50 border border-white/10 text-sm text-white rounded-full py-2 pl-10 pr-4 focus:outline-none focus:bg-black focus:border-white/30 transition-all placeholder-gray-500"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                {searchResults.length > 0 && (
-                  <div className="absolute top-full mt-2 w-full bg-gray-900 border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+          {/* 2. SEARCH BAR (Center - Only if logged in) */}
+          {user && (
+            <div className="flex-1 max-w-lg relative hidden md:block group mx-4">
+              <div className="relative flex items-center">
+                <Search className="absolute left-3 w-4 h-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search movies..."
+                  className="w-full bg-white/10 border border-white/10 text-sm text-white rounded-full py-2.5 pl-10 pr-4 focus:outline-none focus:bg-black focus:border-blue-500/50 transition-all placeholder-gray-500"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+              
+              {/* Search Results Dropdown */}
+              {searchResults.length > 0 && (
+                <div className="absolute top-full mt-2 w-full bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
+                  <div className="max-h-[300px] overflow-y-auto premium-scrollbar">
                     {searchResults.map((movie) => (
                       <Link
                         key={movie.id}
                         href={`/movie/${movie.id}`}
-                        className="flex items-center gap-3 p-3 hover:bg-white/5 border-b border-white/5 last:border-0"
+                        className="flex items-center gap-3 p-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
                         onClick={() => { setSearchQuery(''); setSearchResults([]); }}
                       >
-                        {movie.poster_path && <Image src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`} alt={movie.title} width={30} height={45} className="rounded" />}
+                        <div className="relative w-8 h-12 flex-shrink-0 bg-gray-800 rounded overflow-hidden">
+                           {movie.poster_path ? (
+                             <Image src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`} alt={movie.title} fill className="object-cover" />
+                           ) : <div className="w-full h-full bg-gray-700" />}
+                        </div>
                         <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white">{movie.title}</span>
+                          <span className="text-sm font-bold text-white line-clamp-1">{movie.title}</span>
                           <span className="text-xs text-gray-500">{movie.release_date?.split('-')[0]}</span>
                         </div>
                       </Link>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
+          )}
 
-              {/* RIGHT ACTIONS */}
-              <div className="flex items-center gap-4 md:gap-6">
-                <nav className="hidden md:flex gap-6 text-sm font-medium">
-                  <Link href="/dashboard" className="text-gray-300 hover:text-white">Home</Link>
-                  <Link href="/results" className="text-gray-300 hover:text-white">My List</Link>
+          {/* 3. RIGHT SIDE ACTIONS */}
+          <div className="flex items-center gap-4 md:gap-6">
+            
+            {user ? (
+              <>
+                {/* Desktop Links */}
+                <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+                  <Link href="/dashboard" className={isActive('/dashboard')}>Rate</Link>
+                  <Link href="/results" className={isActive('/results')}>Recommendations</Link>
+                  <Link href="/watchlist" className={isActive('/watchlist')}>Watchlist</Link>
                 </nav>
 
+                {/* Profile Dropdown */}
                 <div className="relative" ref={profileRef}>
-                  <button onClick={() => setProfileOpen(!profileOpen)} className="w-8 h-8 rounded-full overflow-hidden border border-white/20 hover:border-white transition-colors">
-                    {/* AVATAR LOGIC */}
+                  <button 
+                    onClick={() => setProfileOpen(!profileOpen)} 
+                    className="w-9 h-9 rounded-full overflow-hidden border border-white/20 hover:border-white transition-colors focus:outline-none"
+                  >
                     {user.user_metadata?.avatar_url ? (
-                      <Image src={user.user_metadata.avatar_url} alt="User" width={32} height={32} />
+                      <Image src={user.user_metadata.avatar_url} alt="User" width={36} height={36} className="object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                      <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
                         {user.email?.charAt(0).toUpperCase()}
                       </div>
                     )}
                   </button>
+
                   {/* Dropdown Menu */}
                   {profileOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-black border border-white/10 rounded-lg shadow-xl py-1">
+                    <div className="absolute right-0 top-full mt-3 w-56 bg-gray-900 border border-white/10 rounded-xl shadow-2xl py-2 animate-in fade-in zoom-in-95 z-50">
                       <div className="px-4 py-3 border-b border-white/10 mb-1">
-                        <p className="text-xs text-gray-400">Signed in as</p>
+                        <p className="text-xs text-gray-500">Signed in as</p>
                         <p className="text-sm font-bold text-white truncate">{user.email}</p>
                       </div>
-                      <Link href="/results" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white">
-                        <Film className="w-4 h-4" /> My Ratings
+                      
+                      <Link 
+                        href="/watchlist" 
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Film className="w-4 h-4" /> My Watchlist
                       </Link>
+                      
                       <Link
                         href="/settings"
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
-                        onClick={() => setProfileOpen(false)} // Close menu on click
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
+                        onClick={() => setProfileOpen(false)}
                       >
                         <Settings className="w-4 h-4" /> Settings
                       </Link>
+
                       <div className="border-t border-white/10 mt-1 pt-1">
                         <button
-                          onClick={() => { setProfileOpen(false); setShowSignOutModal(true); }} // <--- CHANGE THIS
-                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10"
+                          onClick={() => { setProfileOpen(false); setShowSignOutModal(true); }}
+                          className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
                         >
                           <LogOut className="w-4 h-4" /> Sign Out
                         </button>
@@ -185,29 +227,82 @@ export default function Navigation() {
                     </div>
                   )}
                 </div>
-              </div>
-            </>
-          ) : (
-            /* IF NOT LOGGED IN: SHOW LOGIN BUTTON */
-            <div className="flex items-center gap-4">
+              </>
+            ) : (
+              /* Not Logged In */
               <Link href="/login" className="px-6 py-2 bg-white text-black font-bold text-sm rounded-full hover:bg-gray-200 transition-colors">
                 Sign In
               </Link>
-            </div>
-          )}
+            )}
+
+            {/* Mobile Toggle */}
+            <button 
+              className="md:hidden text-white"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X /> : <Menu />}
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* SIGN OUT CONFIRMATION MODAL */}
+      {/* MOBILE MENU OVERLAY */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-xl pt-24 px-6 animate-in slide-in-from-top-10 md:hidden">
+          {user ? (
+            <div className="space-y-6">
+              {/* Mobile Search */}
+              <div className="relative">
+                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-500" />
+                 <input 
+                   type="text" 
+                   placeholder="Search..." 
+                   className="w-full bg-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                   value={searchQuery}
+                   onChange={(e) => setSearchQuery(e.target.value)}
+                 />
+                 {searchResults.length > 0 && (
+                   <div className="mt-2 bg-gray-800 rounded-xl overflow-hidden">
+                     {searchResults.slice(0, 3).map(m => (
+                       <Link 
+                         key={m.id} 
+                         href={`/movie/${m.id}`} 
+                         onClick={() => setMobileMenuOpen(false)}
+                         className="block p-3 border-b border-white/5 text-sm"
+                       >
+                         {m.title}
+                       </Link>
+                     ))}
+                   </div>
+                 )}
+              </div>
+
+              <div className="space-y-4">
+                <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="block text-2xl font-bold text-white">Rate Movies</Link>
+                <Link href="/results" onClick={() => setMobileMenuOpen(false)} className="block text-2xl font-bold text-white">Recommendations</Link>
+                <Link href="/watchlist" onClick={() => setMobileMenuOpen(false)} className="block text-2xl font-bold text-white">My Watchlist</Link>
+              </div>
+
+              <div className="pt-8 border-t border-white/10">
+                <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block text-gray-400 mb-4">Settings</Link>
+                <button onClick={() => { setMobileMenuOpen(false); setShowSignOutModal(true); }} className="text-red-500 font-bold">Sign Out</button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full space-y-4">
+               <h2 className="text-2xl font-bold">Ready to watch?</h2>
+               <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-4 bg-white text-black font-bold rounded-xl text-center">
+                 Sign In Now
+               </Link>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* SIGN OUT MODAL */}
       {showSignOutModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-            onClick={() => setShowSignOutModal(false)}
-          />
-
-          {/* Modal Content */}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowSignOutModal(false)} />
           <div className="relative bg-gray-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-in zoom-in-95">
             <div className="flex flex-col items-center text-center gap-4">
               <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center">
@@ -215,23 +310,11 @@ export default function Navigation() {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-white">Sign Out?</h3>
-                <p className="text-sm text-gray-400 mt-1">
-                  You will need to verify your email to log back in.
-                </p>
+                <p className="text-sm text-gray-400 mt-1">You will need to verify your email to log back in.</p>
               </div>
               <div className="flex gap-3 w-full mt-2">
-                <button
-                  onClick={() => setShowSignOutModal(false)}
-                  className="flex-1 py-2.5 rounded-xl font-medium text-gray-300 hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSignOut}
-                  className="flex-1 py-2.5 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition-colors"
-                >
-                  Yes, Sign Out
-                </button>
+                <button onClick={() => setShowSignOutModal(false)} className="flex-1 py-2.5 rounded-xl font-medium text-gray-300 hover:bg-white/5 transition-colors">Cancel</button>
+                <button onClick={confirmSignOut} className="flex-1 py-2.5 rounded-xl font-bold bg-red-600 text-white hover:bg-red-700 transition-colors">Yes, Sign Out</button>
               </div>
             </div>
           </div>

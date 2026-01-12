@@ -33,7 +33,7 @@ export default function RootLayout({
         <Navigation />
         
         {/* Content wrapper with minimum height to push footer down */}
-        <main className="min-h-screen pt-20 flex flex-col">
+        <main className="min-h-screen pt-16 flex flex-col">
           {children}
         </main>
 
