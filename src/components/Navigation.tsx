@@ -8,15 +8,16 @@ import { createClient } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 import { searchMovies } from '@/app/actions';
 import { Movie } from '@/app/types'; // Ensure you have this type or remove generic if needed
-import { 
-  Search, 
-  Menu, 
-  X, 
-  LogOut, 
-  Film, 
-  Settings, 
-  AlertTriangle, 
-  User as UserIcon 
+import SearchBar from './SearchBar'; // Import the new component
+import {
+  Search,
+  Menu,
+  X,
+  LogOut,
+  Film,
+  Settings,
+  AlertTriangle,
+  User as UserIcon
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -28,8 +29,11 @@ export default function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Movie[]>([]);
+
+  // Mobile Search State (Separate from Desktop SearchBar)
+  const [mobileQuery, setMobileQuery] = useState('');
+  const [mobileResults, setMobileResults] = useState<Movie[]>([]);
+
   const [user, setUser] = useState<User | null>(null);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
 
@@ -71,19 +75,20 @@ export default function Navigation() {
     };
   }, []);
 
-  // 3. Live Search Logic
+  // 3. Mobile Live Search Logic
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (searchQuery.length > 2) {
-        // Safe Cast
-        const results = await searchMovies(searchQuery) as unknown as Movie[];
-        setSearchResults(results);
+      if (mobileQuery.length > 2) {
+        try {
+          const results = await searchMovies(mobileQuery) as unknown as Movie[];
+          setMobileResults(results);
+        } catch (e) { console.error(e); }
       } else {
-        setSearchResults([]);
+        setMobileResults([]);
       }
     }, 500); // 500ms debounce
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [mobileQuery]);
 
   const confirmSignOut = async () => {
     await supabase.auth.signOut();
@@ -101,11 +106,10 @@ export default function Navigation() {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${
-          isScrolled || mobileMenuOpen
-            ? 'bg-black/80 backdrop-blur-xl border-white/10' 
-            : 'bg-gradient-to-b from-black/80 to-transparent border-transparent'
-        }`}
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 border-b ${isScrolled || mobileMenuOpen
+          ? 'bg-black/80 backdrop-blur-xl border-white/10'
+          : 'bg-gradient-to-b from-black/80 to-transparent border-transparent'
+          }`}
       >
         <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between gap-4">
 
@@ -125,49 +129,14 @@ export default function Navigation() {
 
           {/* 2. SEARCH BAR (Center - Only if logged in) */}
           {user && (
-            <div className="flex-1 max-w-lg relative hidden md:block group mx-4">
-              <div className="relative flex items-center">
-                <Search className="absolute left-3 w-4 h-4 text-gray-400 group-focus-within:text-blue-400 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="Search movies..."
-                  className="w-full bg-white/10 border border-white/10 text-sm text-white rounded-full py-2.5 pl-10 pr-4 focus:outline-none focus:bg-black focus:border-blue-500/50 transition-all placeholder-gray-500"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              
-              {/* Search Results Dropdown */}
-              {searchResults.length > 0 && (
-                <div className="absolute top-full mt-2 w-full bg-gray-900 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
-                  <div className="max-h-[300px] overflow-y-auto premium-scrollbar">
-                    {searchResults.map((movie) => (
-                      <Link
-                        key={movie.id}
-                        href={`/movie/${movie.id}`}
-                        className="flex items-center gap-3 p-3 hover:bg-white/5 border-b border-white/5 last:border-0 transition-colors"
-                        onClick={() => { setSearchQuery(''); setSearchResults([]); }}
-                      >
-                        <div className="relative w-8 h-12 flex-shrink-0 bg-gray-800 rounded overflow-hidden">
-                           {movie.poster_path ? (
-                             <Image src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`} alt={movie.title} fill className="object-cover" />
-                           ) : <div className="w-full h-full bg-gray-700" />}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-white line-clamp-1">{movie.title}</span>
-                          <span className="text-xs text-gray-500">{movie.release_date?.split('-')[0]}</span>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="flex-1 flex justify-center max-w-lg mx-4">
+              <SearchBar />
             </div>
           )}
 
           {/* 3. RIGHT SIDE ACTIONS */}
           <div className="flex items-center gap-4 md:gap-6">
-            
+
             {user ? (
               <>
                 {/* Desktop Links */}
@@ -179,8 +148,8 @@ export default function Navigation() {
 
                 {/* Profile Dropdown */}
                 <div className="relative" ref={profileRef}>
-                  <button 
-                    onClick={() => setProfileOpen(!profileOpen)} 
+                  <button
+                    onClick={() => setProfileOpen(!profileOpen)}
                     className="w-9 h-9 rounded-full overflow-hidden border border-white/20 hover:border-white transition-colors focus:outline-none"
                   >
                     {user.user_metadata?.avatar_url ? (
@@ -199,15 +168,23 @@ export default function Navigation() {
                         <p className="text-xs text-gray-500">Signed in as</p>
                         <p className="text-sm font-bold text-white truncate">{user.email}</p>
                       </div>
-                      
-                      <Link 
-                        href="/watchlist" 
+
+                      <Link
+                        href="/ratings"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Film className="w-4 h-4" /> My Ratings
+                      </Link>
+
+                      <Link
+                        href="/watchlist"
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
                         onClick={() => setProfileOpen(false)}
                       >
                         <Film className="w-4 h-4" /> My Watchlist
                       </Link>
-                      
+
                       <Link
                         href="/settings"
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
@@ -236,7 +213,7 @@ export default function Navigation() {
             )}
 
             {/* Mobile Toggle */}
-            <button 
+            <button
               className="md:hidden text-white"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
@@ -253,28 +230,28 @@ export default function Navigation() {
             <div className="space-y-6">
               {/* Mobile Search */}
               <div className="relative">
-                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-500" />
-                 <input 
-                   type="text" 
-                   placeholder="Search..." 
-                   className="w-full bg-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                   value={searchQuery}
-                   onChange={(e) => setSearchQuery(e.target.value)}
-                 />
-                 {searchResults.length > 0 && (
-                   <div className="mt-2 bg-gray-800 rounded-xl overflow-hidden">
-                     {searchResults.slice(0, 3).map(m => (
-                       <Link 
-                         key={m.id} 
-                         href={`/movie/${m.id}`} 
-                         onClick={() => setMobileMenuOpen(false)}
-                         className="block p-3 border-b border-white/5 text-sm"
-                       >
-                         {m.title}
-                       </Link>
-                     ))}
-                   </div>
-                 )}
+                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  className="w-full bg-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={mobileQuery}
+                  onChange={(e) => setMobileQuery(e.target.value)}
+                />
+                {mobileResults.length > 0 && (
+                  <div className="mt-2 bg-gray-800 rounded-xl overflow-hidden">
+                    {mobileResults.slice(0, 3).map(m => (
+                      <Link
+                        key={m.id}
+                        href={`/movie/${m.id}`}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="block p-3 border-b border-white/5 text-sm"
+                      >
+                        {m.title}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -290,10 +267,10 @@ export default function Navigation() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full space-y-4">
-               <h2 className="text-2xl font-bold">Ready to watch?</h2>
-               <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-4 bg-white text-black font-bold rounded-xl text-center">
-                 Sign In Now
-               </Link>
+              <h2 className="text-2xl font-bold">Ready to watch?</h2>
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="w-full py-4 bg-white text-black font-bold rounded-xl text-center">
+                Sign In Now
+              </Link>
             </div>
           )}
         </div>

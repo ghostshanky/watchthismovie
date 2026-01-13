@@ -1,140 +1,116 @@
-'use client';
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabaseClient';
-// FIX: Import the strictly defined User type
-import { User } from '@supabase/supabase-js';
-import { Save, Loader2, Camera } from 'lucide-react';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import Link from 'next/link';
+import { Settings, Globe, RefreshCw, Database, ChevronRight, LogOut, MapPin } from 'lucide-react';
+import { getCountryCode } from '@/lib/getCountry'; // We use the helper we made earlier
 
-export default function SettingsPage() {
-  const supabase = createClient();
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  
-  // FIX: Typed correctly as User | null
-  const [user, setUser] = useState<User | null>(null);
-  
-  // Form State
-  const [fullName, setFullName] = useState('');
-  const [username, setUsername] = useState('');
+// Client Component for the "Reset" button logic
+import ResetOnboardingButton from '@/components/ResetOnboardingButton';
+import SignOutButton from '@/components/SignOutButton';
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        setFullName(session.user.user_metadata?.full_name || '');
-        setUsername(session.user.user_metadata?.username || '');
-      }
-      setLoading(false);
-    };
-    loadProfile();
-  }, [supabase]);
+export default async function SettingsPage() {
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll() { return cookieStore.getAll() } } }
+  );
 
-  const handleUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const { data: { user } } = await supabase.auth.getUser();
 
-    // Save to Supabase Auth Metadata
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: fullName, username: username }
-    });
+  if (!user) return <div className="p-20 text-white">Please log in.</div>;
 
-    setSaving(false);
-    if (error) {
-      alert("Failed to update profile");
-    } else {
-      alert("Profile updated successfully!");
-      window.location.reload(); 
-    }
-  };
+  // 1. Fetch Profile Data (Taste DNA)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('taste_dna')
+    .eq('id', user.id)
+    .single();
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
+  // 2. Get Detected Region
+  const country = await getCountryCode();
+  const countryNames: Record<string, string> = { 'IN': 'India', 'US': 'United States', 'GB': 'United Kingdom' };
 
   return (
-    <div className="min-h-screen bg-black text-white pt-24 px-4 pb-12">
-      <div className="max-w-2xl mx-auto space-y-8">
-        
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Account Settings</h1>
-          <p className="text-gray-400">Manage your profile and preferences.</p>
-        </div>
+    <div className="min-h-screen bg-black text-white pt-24 px-6 md:px-12 pb-20">
+      
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-4xl font-bold mb-8">Settings</h1>
 
-        <div className="bg-gray-900/50 border border-white/10 rounded-2xl p-6 md:p-8">
-          <form onSubmit={handleUpdate} className="space-y-6">
+        {/* SECTION 1: ACCOUNT */}
+        <div className="bg-gray-900/50 border border-white/10 rounded-2xl overflow-hidden mb-8">
+          <div className="p-6 border-b border-white/5">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Settings className="w-5 h-5 text-blue-400" /> Account
+            </h2>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-gray-400">Email Address</p>
+                <p className="font-medium">{user.email}</p>
+              </div>
+              <span className="px-3 py-1 bg-green-500/10 text-green-500 text-xs font-bold rounded-full">
+                Verified
+              </span>
+            </div>
             
-            {/* Avatar Section */}
-            <div className="flex items-center gap-6">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-2xl font-bold">
-                   {/* Fallback to Initials */}
-                   {fullName ? fullName.charAt(0).toUpperCase() : user?.email?.charAt(0).toUpperCase()}
-                </div>
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-full">
-                  <Camera className="w-6 h-6 text-white" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <h3 className="font-medium text-white">Profile Photo</h3>
-                <p className="text-xs text-gray-500">Synced with your email provider or auto-generated.</p>
-              </div>
+            <div className="flex justify-between items-center">
+               <div>
+                 <p className="text-sm text-gray-400">Streaming Region</p>
+                 <div className="flex items-center gap-2 mt-1">
+                   <MapPin className="w-4 h-4 text-gray-500" />
+                   <p className="font-medium">{countryNames[country] || country} (Detected)</p>
+                 </div>
+               </div>
+               {/* In V2, we can make this editable */}
+               <span className="text-xs text-gray-600">Auto-detected</span>
             </div>
-
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Full Name</label>
-                <input 
-                  type="text" 
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  placeholder="e.g. John Doe"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Username</label>
-                <input 
-                  type="text" 
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                  placeholder="e.g. moviebuff99"
-                />
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-gray-400 uppercase">Email Address</label>
-                <input 
-                  type="email" 
-                  value={user?.email}
-                  disabled
-                  className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-3 text-gray-400 cursor-not-allowed"
-                />
-                <p className="text-[10px] text-gray-500">Email cannot be changed for security reasons.</p>
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-white/5 flex justify-end">
-              <button 
-                type="submit" 
-                disabled={saving}
-                className="bg-white text-black px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition-colors flex items-center gap-2"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Save Changes
-              </button>
-            </div>
-
-          </form>
+          </div>
         </div>
 
-        {/* Danger Zone */}
-        <div className="border border-red-500/20 bg-red-500/5 rounded-2xl p-6">
-          <h3 className="text-red-500 font-bold mb-2">Danger Zone</h3>
-          <p className="text-sm text-gray-400 mb-4">Deleting your account is permanent. All your ratings will be lost.</p>
-          <button type="button" className="text-xs bg-red-500/10 text-red-500 border border-red-500/20 px-4 py-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors">
-            Delete Account
-          </button>
+        {/* SECTION 2: TASTE DNA (The Important Part) */}
+        <div className="bg-gray-900/50 border border-white/10 rounded-2xl overflow-hidden mb-8">
+          <div className="p-6 border-b border-white/5 flex justify-between items-center">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Database className="w-5 h-5 text-purple-400" /> Taste Preferences
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="mb-6">
+              <p className="text-sm text-gray-400 mb-3">Selected Industries</p>
+              <div className="flex flex-wrap gap-2">
+                {profile?.taste_dna?.languages && profile.taste_dna.languages.length > 0 ? ( // Fix: Added null check for profile.taste_dna
+                  profile.taste_dna.languages.map((lang: string) => (
+                    <span key={lang} className="px-3 py-1 bg-white/10 border border-white/10 rounded text-sm uppercase">
+                      {lang}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-gray-500 italic">No preferences set</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-6 border-t border-white/5">
+              <div>
+                <p className="font-bold">Retake Onboarding</p>
+                <p className="text-sm text-gray-400">Reset your industries and seed movies.</p>
+              </div>
+              <ResetOnboardingButton />
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 3: DANGER ZONE */}
+        <div className="border border-red-500/20 rounded-2xl overflow-hidden">
+          <div className="p-6 flex justify-between items-center">
+             <div className="text-red-400">
+               <p className="font-bold">Sign Out</p>
+               <p className="text-sm opacity-70">End your current session.</p>
+             </div>
+             <SignOutButton />
+          </div>
         </div>
 
       </div>
