@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import LandingGuest from '@/components/landing/LandingGuest'; // We will create this
-import LandingUser from '@/components/landing/LandingUser';   // We will create this
+import LandingGuest from '@/components/landing/LandingGuest';
+import LandingUser from '@/components/landing/LandingUser';
+import { fetchPersonalizedFeed, fetchTrendingMovies } from '@/app/actions';
 
 export default async function Page() {
   const cookieStore = await cookies();
@@ -13,8 +15,16 @@ export default async function Page() {
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  // GOD LEVEL LOGIC:
-  // If user is logged in, show the "Command Center" (LandingUser).
-  // If guest, show the "Emotional Hook" (LandingGuest).
-  return user ? <LandingUser user={user} /> : <LandingGuest />;
+  if (user) {
+    // FETCH THE #1 RECOMMENDATION FOR THIS USER
+    const personalized = await fetchPersonalizedFeed(user.id);
+    const trending = await fetchTrendingMovies();
+
+    // Fallback to trending if personalized is empty
+    const bestMatch = personalized[0] || trending[0];
+
+    return <LandingUser user={user} bestMatch={bestMatch as any} />;
+  }
+
+  return <LandingGuest />;
 }

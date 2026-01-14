@@ -106,27 +106,34 @@ export async function fetchInitialBatch(userId: string) {
     { cookies: { getAll() { return cookieStore.getAll() } } }
   );
 
-  // Get IDs we have already seen
+  // 1. Get ALL IDs as STRINGS to be safe
   const { data: seen } = await supabase
     .from('user_interactions')
     .select('movie_id')
     .eq('user_id', userId);
 
-  const seenIds = new Set(seen?.map(x => x.movie_id) || []);
+  const seenIds = new Set(seen?.map(x => String(x.movie_id)) || []);
 
-  // Fetch Trending
-  const res = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US`, { next: { revalidate: 3600 } });
-  const data = await res.json();
-  const movies = data.results as TMDBMovie[] || [];
+  // 2. Fetch Trending (Get 2 pages to ensure we have enough fresh movies)
+  const res1 = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US&page=1`);
+  const data1 = await res1.json();
 
-  // Return only ones we haven't seen
-  return movies.filter(m => !seenIds.has(m.id)).slice(0, 5); // Start with 5
+  const res2 = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US&page=2`);
+  const data2 = await res2.json();
+
+  const allMovies = [...(data1.results || []), ...(data2.results || [])] as TMDBMovie[];
+
+  // 3. STRICT FILTER (String vs String)
+  // If Interstellar (id: 157336) is in seenIds ("157336"), it WILL be removed.
+  const freshMovies = allMovies.filter(m => !seenIds.has(String(m.id)));
+
+  return freshMovies.slice(0, 5);
 }
 
 // 2. THE "BRAIN": Save Rating & Get Next Suggestions
 export async function submitRatingAndGetNext(
   userId: string,
-  movie: { id: number, title: string, poster_path: string },
+  movie: { id: number, title: string, poster_path: string | null },
   liked: boolean
 ) {
   checkKey();
@@ -233,9 +240,11 @@ export async function getRecommendations(userId: string) {
 // 3. PERSONALIZED FEED ACTION
 // -----------------------------------------------------------------------------
 
-export async function fetchPersonalizedFeed(userId: string) {
-  checkKey();
+import { unstable_noStore as noStore } from 'next/cache';
 
+export async function fetchPersonalizedFeed(userId: string) {
+  noStore(); // <--- 1. THIS KILLS THE CACHE (Forces fresh fetch)
+  checkKey();
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -243,34 +252,46 @@ export async function fetchPersonalizedFeed(userId: string) {
     { cookies: { getAll() { return cookieStore.getAll() } } }
   );
 
-  // 1. Get User Preferences
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('taste_dna')
-    .eq('id', userId)
-    .single();
+  // 1. Get ALL IDs (Watched OR Skipped) - Strict String Conversion
+  const { data: seen } = await supabase
+    .from('user_interactions')
+    .select('movie_id')
+    .eq('user_id', userId);
 
-  const languages = profile?.taste_dna?.languages || []; // e.g. ['en', 'hi']
+  // Convert everything to String to be safe
+  const seenIds = new Set(seen?.map(x => String(x.movie_id)) || []);
 
-  // LOGIC FIX:
-  // If we have languages, use them.
-  // BUT: Sort by 'vote_count.desc' (Most Rated) so we get FAMOUS movies first.
-  // This solves the "I don't know these movies" problem.
+  console.log("🚫 Seen IDs:", Array.from(seenIds)); // Debug: See what is blocked
 
-  const langParam = languages.length > 0 ? `&with_original_language=${languages.join('|')}` : '';
+  // 2. Fetch User's Last Liked Movie
+  const { data: lastLiked } = await supabase
+    .from('user_interactions')
+    .select('movie_id')
+    .eq('user_id', userId)
+    .eq('liked', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  try {
-    const res = await fetch(
-      `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=vote_count.desc&vote_count.gte=3000${langParam}&page=1`,
-      { next: { revalidate: 3600 } }
-    );
+  let movies: TMDBMovie[] = [];
+
+  if (lastLiked) {
+    const res = await fetch(`${TMDB_BASE_URL}/movie/${lastLiked.movie_id}/recommendations?api_key=${TMDB_KEY}&language=en-US`);
     const data = await res.json();
-    return data.results as TMDBMovie[] || [];
-  } catch (error) {
-    console.error("Personalized Feed Error:", error);
-    // Fallback to strict top rated popular if discover fails
-    return fetchTrendingMovies();
+    movies = data.results || [];
+  } else {
+    // Fallback to Trending
+    const res = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US`);
+    const data = await res.json();
+    movies = data.results || [];
   }
+
+  // 3. STRICT FILTER
+  const freshMovies = movies.filter(m => !seenIds.has(String(m.id)));
+
+  console.log("✅ First Fresh Movie:", freshMovies[0]?.title); // Debug: Check who won
+
+  return freshMovies;
 }
 
 // -----------------------------------------------------------------------------
@@ -304,36 +325,44 @@ export async function getMovieDetails(id: string) {
     } as unknown as any; // Cast to satisfy return type
   }
 
-  // Helper: Debugging Fetch with CACHING enabled + STRONGER RETRIES
-  const safeFetch = async <T>(endpoint: string, retries = 5): Promise<T | null> => {
+  // Helper: Debugging Fetch with STRONGER RETRIES
+  const safeFetch = async <T>(endpoint: string, retries = 3): Promise<T | null> => {
+    // Re-access env var to ensure it's fresh
+    const API_KEY = process.env.NEXT_PUBLIC_TMDB_KEY?.trim() || TMDB_KEY;
+    if (!API_KEY) {
+      console.error("❌ safeFetch: API Key Missing!");
+      return null;
+    }
+
     const url = new URL(`${TMDB_BASE_URL}/movie/${id}${endpoint}`);
-    url.searchParams.append('api_key', TMDB_KEY!);
+    url.searchParams.append('api_key', API_KEY);
     url.searchParams.append('language', 'en-US');
+
+    // Debug Log
+    console.log(`🔍 Fetching: ${url.pathname} (Key present: ${!!API_KEY})`);
 
     for (let i = 0; i < retries; i++) {
       try {
         const res = await fetch(url.toString(), {
           method: 'GET',
           headers: { 'Accept': 'application/json' },
-          next: { revalidate: 3600 }
+          cache: 'no-store' // Explicitly disable cache
         });
 
         if (!res.ok) {
           if (res.status === 404) return null;
-          console.warn(`⚠️ API Error ${res.status} for: ${url.pathname} (Attempt ${i + 1})`);
+          console.warn(`⚠️ API Error ${res.status} for: ${endpoint} (Attempt ${i + 1})`);
           if (res.status >= 500) throw new Error(`Server Error ${res.status}`);
           return null;
         }
         return await res.json() as T;
 
-      } catch (error) {
-        const isLastAttempt = i === retries - 1;
-        if (isLastAttempt) {
-          console.error(`❌ Final Network Crash for ID ${id}${endpoint}:`, error);
+      } catch (error: any) {
+        console.error(`❌ Attempt ${i + 1} Failed for ${endpoint}:`, error.message, error.cause);
+        if (i === retries - 1) {
           return null;
         }
-        // Stronger Backoff: 800ms, 1600ms...
-        await new Promise(resolve => setTimeout(resolve, 800 * (i + 1)));
+        await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
       }
     }
     return null;

@@ -1,8 +1,11 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import Image from 'next/image';
 import { getMovieDetails } from '@/app/actions';
-import { PlayCircle, Star, Clock, Calendar, ChevronLeft } from 'lucide-react';
+import { PlayCircle, Star, Clock, Calendar, ChevronLeft, Eye, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistButton from '@/components/WatchlistButton';
+import RatingSlider from '@/components/RatingSlider';
 
 // 1. DEFINE TYPES
 interface Genre {
@@ -63,9 +66,35 @@ export default async function MovieDetailsPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params;
+  const movieIdInt = parseInt(id);
 
   // Fetch Data
   const movie = await getMovieDetails(id) as unknown as MovieDetails;
+
+  // 2. Setup Supabase to Check "Seen" Status
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll() { return cookieStore.getAll() } } }
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  let interaction = null;
+  if (user && !isNaN(movieIdInt)) {
+    const { data } = await supabase
+      .from('user_interactions')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('movie_id', movieIdInt)
+      .maybeSingle();
+    interaction = data;
+  }
+
+  const isSeen = interaction?.has_watched === true;
+  const isLiked = interaction?.liked;
+
 
   // 1. SAFETY CHECK: If the API failed to get the TITLE, the movie is broken.
   if (!movie || !movie.title) {
@@ -109,6 +138,34 @@ export default async function MovieDetailsPage({
         </div>
 
         <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 z-10 max-w-4xl">
+
+          {/* --- SEEN BADGE (Merged) --- */}
+          {isSeen && (
+            <div className="inline-flex items-center gap-3 px-4 py-2 mb-6 bg-green-500/20 border border-green-500/40 rounded-full text-green-400 font-bold uppercase tracking-widest text-xs shadow-[0_0_20px_rgba(34,197,94,0.3)] backdrop-blur-md">
+              <div className="relative flex items-center justify-center">
+                <Eye className="w-4 h-4" />
+                <div className="absolute -bottom-1 -right-1 bg-green-500 text-black rounded-full p-[1px] border border-black">
+                  <Check className="w-1.5 h-1.5" />
+                </div>
+              </div>
+              <span>Watched</span>
+              {isLiked !== null && (
+                <>
+                  <span className="w-1 h-1 bg-green-500 rounded-full mx-1 opacity-50" />
+                  {isLiked ? (
+                    <span className="flex items-center gap-1.5 text-white font-medium">
+                      <ThumbsUp className="w-3 h-3 fill-white/20" /> Liked
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-white font-medium">
+                      <ThumbsDown className="w-3 h-3 fill-white/20" /> Disliked
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {/* TAGS (Safe Map) */}
           <div className="flex flex-wrap items-center gap-3 mb-4 text-xs font-bold tracking-widest uppercase">
             {(movie.genres || []).map((g) => (
@@ -132,28 +189,46 @@ export default async function MovieDetailsPage({
             </span>
           </div>
 
-          <div className="flex gap-4">
+          {/* ACTION BUTTONS */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 pt-6 w-full sm:w-auto">
+
+            {/* SLIDER (Takes full width on mobile) */}
+            {!isSeen && (
+              <div className="w-full sm:w-auto">
+                <RatingSlider movie={movie} userId={user?.id || ''} />
+              </div>
+            )}
+
+            {/* WATCHLIST (Standard Button) */}
+            {!isSeen && (
+              <div className="shrink-0">
+                <WatchlistButton
+                  movie={{
+                    id: movie.id,
+                    title: movie.title,
+                    poster_path: movie.poster_path,
+                    backdrop_path: movie.backdrop_path,
+                    release_date: movie.release_date,
+                    vote_average: movie.vote_average,
+                    overview: movie.overview,
+                    original_language: 'en',
+                    genre_ids: []
+                  }}
+                />
+              </div>
+            )}
+
+            {/* TRAILER (Standard Button) */}
             {trailer && (
               <a
-                href="#trailer"
-                className="px-8 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center gap-2"
+                href={`https://www.youtube.com/results?search_query=${movie.title}+trailer`}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 px-8 py-4 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
               >
                 <PlayCircle className="w-5 h-5" /> Watch Trailer
               </a>
             )}
-            <WatchlistButton
-              movie={{
-                id: movie.id,
-                title: movie.title,
-                poster_path: movie.poster_path,
-                backdrop_path: movie.backdrop_path,
-                release_date: movie.release_date,
-                vote_average: movie.vote_average,
-                overview: movie.overview,
-                original_language: 'en', // default or fetch if needed
-                genre_ids: [] // optional
-              }}
-            />
           </div>
         </div>
       </div>

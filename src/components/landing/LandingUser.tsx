@@ -1,87 +1,131 @@
+'use client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
-import { ArrowRight, PlayCircle, Star, Database } from 'lucide-react';
-import { createClient } from '@/lib/supabaseClient'; // Client side is fine for quick interactions, or pass data from server
+import { Info, Star, TrendingUp, Compass, PlayCircle } from 'lucide-react';
+import { Movie } from '@/app/types';
+import RatingSlider from '@/components/RatingSlider';
 
-export default function LandingUser({ user }: { user: User }) {
-  // We can greet them by name if we have it, or email
+export default function LandingUser({ user, bestMatch }: { user: User, bestMatch: Movie }) {
+  const router = useRouter();
   const name = user.user_metadata?.full_name || user.email?.split('@')[0];
 
+  if (!bestMatch) return null;
+
   return (
-    <div className="min-h-screen bg-black text-white flex items-center justify-center p-6 relative overflow-hidden">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden font-sans">
 
-      {/* Abstract Tech Background */}
-      <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-blue-900/10 blur-[150px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-900/10 blur-[150px] rounded-full pointer-events-none" />
+      {/* ================= BACKGROUND ================= */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src={`https://image.tmdb.org/t/p/original${bestMatch.poster_path}`}
+          alt={bestMatch.title}
+          fill
+          className="object-cover opacity-60 md:opacity-40"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/30 md:via-black/60" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/80" />
+      </div>
 
-      <div className="max-w-4xl w-full z-10 grid md:grid-cols-2 gap-12 items-center">
+      {/* ================= CONTENT ================= */}
+      <div className="relative z-10 min-h-screen flex flex-col justify-end md:justify-center p-6 md:p-12 max-w-7xl mx-auto">
 
-        {/* Left: Briefing */}
-        <div className="space-y-8 animate-in slide-in-from-left-8 duration-700">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold uppercase tracking-widest mb-4">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              System Online
-            </div>
-            <h1 className="text-5xl md:text-6xl font-bold mb-4">
-              Welcome back, <br />
-              <span className="text-blue-500">{name}.</span>
+        {/* Top Badge */}
+        <div className="absolute top-6 left-6 md:static md:mb-8 animate-in slide-in-from-top-4 duration-700">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-400 text-xs font-bold uppercase tracking-widest backdrop-blur-md">
+            <TrendingUp className="w-3 h-3" /> Top Pick For You
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-end md:items-center">
+
+          {/* TEXT CONTENT */}
+          <div className="space-y-4 md:space-y-6 animate-in slide-in-from-bottom-8 duration-700">
+
+            <h1 className="text-4xl md:text-7xl font-bold leading-tight drop-shadow-2xl">
+              <span className="block text-lg md:text-2xl font-normal text-gray-300 mb-2">Welcome back, {name}</span>
+              {bestMatch.title}
             </h1>
-            <p className="text-xl text-gray-400">
-              Your Taste DNA has evolved. We've curated a fresh set of recommendations based on your recent activity.
-            </p>
-          </div>
 
-          <div className="flex gap-4">
-            <Link
-              href="/rate"
-              className="px-8 py-4 bg-white text-black font-bold text-lg rounded-full hover:scale-105 transition-transform flex items-center gap-2"
-            >
-              Continue Rating <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link
-              href="/results"
-              className="px-8 py-4 bg-white/5 border border-white/10 text-white font-bold text-lg rounded-full hover:bg-white/10 transition-colors flex items-center gap-2"
-            >
-              <Database className="w-5 h-5" /> View My Feed
-            </Link>
-          </div>
-        </div>
-
-        {/* Right: Stats Card (Mockup of their progress) */}
-        <div className="bg-gray-900/50 border border-white/10 rounded-3xl p-8 backdrop-blur-xl animate-in slide-in-from-right-8 duration-700 delay-100 hover:border-blue-500/30 transition-colors">
-          <h3 className="text-gray-400 text-sm font-bold uppercase tracking-widest mb-6">Your Profile Status</h3>
-
-          <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 bg-black/40 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400">
-                  <Star className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="font-bold">Active Rater</div>
-                  <div className="text-xs text-gray-500">Contributing Data</div>
-                </div>
-              </div>
-              <span className="text-green-400 font-mono text-sm">ACTIVE</span>
+            <div className="flex items-center gap-4 text-sm md:text-base font-bold text-gray-200">
+              <span className="text-green-400">98% Match</span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                {bestMatch.vote_average?.toFixed(1)}
+              </span>
+              <span>•</span>
+              <span>{bestMatch.release_date?.split('-')[0]}</span>
             </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">Taste Accuracy</span>
-                <span className="text-white font-bold">High</span>
-              </div>
-              <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-purple-500 w-[75%]" />
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-500 leading-relaxed pt-2">
-              "Based on your last session, we are prioritizing <strong>Thriller</strong> and <strong>Noir</strong> genres in your feed today."
+            <p className="text-gray-300 line-clamp-3 md:line-clamp-4 max-w-xl text-sm md:text-lg leading-relaxed drop-shadow-md">
+              {bestMatch.overview}
             </p>
+
+            {/* --- ACTION SECTION --- */}
+            <div className="pt-4 space-y-6">
+
+              {/* 1. COMPACT SLIDER (Fixed Width) */}
+              {/* Restricting width to max-w-[240px] makes it "small in length" and looks premium */}
+              <div className="w-full max-w-[240px]">
+                <RatingSlider
+                  key={bestMatch.id} // <--- FIX: Force Reset on new movie
+                  movie={{
+                    id: bestMatch.id,
+                    title: bestMatch.title,
+                    poster_path: bestMatch.poster_path || ''
+                  }}
+                  userId={user.id}
+                  variant="default"
+                  onRate={() => {
+                    // Instantly refresh to show the next movie and save to history
+                    router.refresh();
+                  }}
+                />
+              </div>
+
+              {/* 2. NAVIGATION BUTTONS */}
+              <div className="flex flex-wrap gap-3">
+
+                {/* Explore More (Goes to Results) */}
+                <Link
+                  href="/results"
+                  className="px-6 py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center gap-2 shadow-lg"
+                >
+                  <Compass className="w-5 h-5" /> Explore More
+                </Link>
+
+                {/* Info Button */}
+                <Link
+                  href={`/movie/${bestMatch.id}`}
+                  className="px-6 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-bold rounded-full hover:bg-white/20 transition-colors flex items-center gap-2"
+                >
+                  <Info className="w-5 h-5" /> Info
+                </Link>
+
+              </div>
+
+            </div>
           </div>
+
+          {/* DESKTOP POSTER ART */}
+          <div className="hidden md:block justify-self-end animate-in fade-in zoom-in-95 duration-1000 delay-200">
+            <div className="w-64 aspect-[2/3] relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white/5 rotate-3 hover:rotate-0 transition-transform duration-500">
+              <Image
+                src={`https://image.tmdb.org/t/p/w500${bestMatch.poster_path}`}
+                alt={bestMatch.title}
+                fill
+                className="object-cover"
+              />
+            </div>
+          </div>
+
         </div>
 
+        {/* Spacer for mobile */}
+        <div className="h-24 md:h-0" />
       </div>
     </div>
   );

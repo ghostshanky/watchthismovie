@@ -6,6 +6,7 @@ export interface Movie {
   backdrop_path: string | null;
   vote_average: number;
   release_date: string;
+  runtime?: number; // Added for details page
   // We add 'genre_ids' because Search results sometimes use this format
   genre_ids?: number[];
   original_language?: string;

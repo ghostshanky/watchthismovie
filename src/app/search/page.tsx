@@ -1,10 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
-import Image from 'next/image';
+import SmartMovieCard from '@/components/SmartMovieCard';
 import { searchMovies } from '@/app/actions';
 import { Movie } from '@/app/types';
-import { Star, Calendar } from 'lucide-react';
 
 export default async function SearchPage({
     searchParams,
@@ -14,8 +12,29 @@ export default async function SearchPage({
     const params = await searchParams; // Next.js 15 requires awaiting params
     const query = params.q || '';
 
-    // Reuse the search action
-    const results = await searchMovies(query) as unknown as Movie[];
+    // 1. Get User and Supabase
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { cookies: { getAll() { return cookieStore.getAll() } } }
+    );
+    const { data: { user } } = await supabase.auth.getUser();
+
+    // 2. Reuse the search action
+    const results = await searchMovies(query);
+
+    // 3. Fetch "Seen" Status for these movies
+    let seenIds = new Set();
+    if (user) {
+        const { data: seen } = await supabase
+            .from('user_interactions')
+            .select('movie_id')
+            .eq('user_id', user.id)
+            .eq('has_watched', true); // Only count actual watches
+
+        seenIds = new Set(seen?.map(x => x.movie_id));
+    }
 
     return (
         <div className="min-h-screen bg-black text-white pt-24 px-6 md:px-12 pb-20">
@@ -32,39 +51,12 @@ export default async function SearchPage({
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                         {results.map((movie) => (
-                            <Link
+                            <SmartMovieCard
                                 key={movie.id}
-                                href={`/movie/${movie.id}`}
-                                className="group bg-gray-900 rounded-xl overflow-hidden border border-white/5 hover:border-blue-500/50 hover:scale-105 transition-all duration-300"
-                            >
-                                {/* Poster Aspect Ratio Container */}
-                                <div className="relative aspect-[2/3] bg-gray-800">
-                                    {movie.poster_path && (
-                                        <Image
-                                            src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                                            alt={movie.title}
-                                            fill
-                                            className="object-cover"
-                                        />
-                                    )}
-
-                                    {/* Rating Badge Overlay */}
-                                    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold flex items-center gap-1">
-                                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
-                                        {movie.vote_average?.toFixed(1)}
-                                    </div>
-                                </div>
-
-                                <div className="p-4">
-                                    <h3 className="font-bold text-sm truncate group-hover:text-blue-400 transition-colors">
-                                        {movie.title}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                                        <Calendar className="w-3 h-3" />
-                                        {movie.release_date?.split('-')[0] || 'Unknown'}
-                                    </p>
-                                </div>
-                            </Link>
+                                movie={movie}
+                                userId={user?.id || ''}
+                                isSeen={seenIds.has(movie.id)} // <--- THIS TURNS ON THE ICON
+                            />
                         ))}
                     </div>
                 )}
