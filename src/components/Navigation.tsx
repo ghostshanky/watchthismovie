@@ -35,23 +35,47 @@ export default function Navigation() {
   const [mobileResults, setMobileResults] = useState<Movie[]>([]);
 
   const [user, setUser] = useState<User | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
 
   const profileRef = useRef<HTMLDivElement>(null);
 
   // --- EFFECTS ---
 
-  // 1. Get User Session
+  // 1. Get User AND Profile Avatar
   useEffect(() => {
-    const getUser = async () => {
+    const getUserAndProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        // Fetch custom avatar from 'profiles'
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('avatar_url')
+          .eq('id', currentUser.id)
+          .single();
+
+        // Priority: Custom DB Avatar -> Google/Auth Avatar -> Null
+        setAvatarUrl(profile?.avatar_url || currentUser.user_metadata?.avatar_url || null);
+      } else {
+        setAvatarUrl(null);
+      }
     };
-    getUser();
+
+    getUserAndProfile();
 
     // Listen for Auth Changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user || null;
+      setUser(currentUser);
+      if (currentUser) {
+        const { data: profile } = await supabase.from('profiles').select('avatar_url').eq('id', currentUser.id).single();
+        setAvatarUrl(profile?.avatar_url || currentUser.user_metadata?.avatar_url || null);
+      } else {
+        setAvatarUrl(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -93,6 +117,7 @@ export default function Navigation() {
   const confirmSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setAvatarUrl(null);
     router.push('/login');
     setShowSignOutModal(false);
   };
@@ -152,8 +177,8 @@ export default function Navigation() {
                     onClick={() => setProfileOpen(!profileOpen)}
                     className="w-9 h-9 rounded-full overflow-hidden border border-white/20 hover:border-white transition-colors focus:outline-none"
                   >
-                    {user.user_metadata?.avatar_url ? (
-                      <Image src={user.user_metadata.avatar_url} alt="User" width={36} height={36} className="object-cover" />
+                    {avatarUrl ? (
+                      <Image src={avatarUrl} alt="User" width={36} height={36} className="object-cover" />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
                         {user.email?.charAt(0).toUpperCase()}
@@ -186,11 +211,11 @@ export default function Navigation() {
                       </Link>
 
                       <Link
-                        href="/settings"
+                        href="/profile"
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
                         onClick={() => setProfileOpen(false)}
                       >
-                        <Settings className="w-4 h-4" /> Settings
+                        <UserIcon className="w-4 h-4" /> Profile & Settings
                       </Link>
 
                       <div className="border-t border-white/10 mt-1 pt-1">
@@ -261,7 +286,7 @@ export default function Navigation() {
               </div>
 
               <div className="pt-8 border-t border-white/10">
-                <Link href="/settings" onClick={() => setMobileMenuOpen(false)} className="block text-gray-400 mb-4">Settings</Link>
+                <Link href="/profile" onClick={() => setMobileMenuOpen(false)} className="block text-gray-400 mb-4">Profile & Settings</Link>
                 <button onClick={() => { setMobileMenuOpen(false); setShowSignOutModal(true); }} className="text-red-500 font-bold">Sign Out</button>
               </div>
             </div>

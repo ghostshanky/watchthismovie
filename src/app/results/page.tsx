@@ -55,9 +55,9 @@ export default async function ResultsPage() {
             </h3>
 
             {/* HORIZONTAL SCROLL ROW */}
-            <div className="flex gap-4 overflow-x-auto pb-6 premium-scrollbar snap-x">
+            <div className="flex gap-4 overflow-x-auto pb-6 premium-scrollbar touch-pan-x transform-gpu no-scrollbar">
               {section.movies.map((movie) => (
-                <div key={movie.id} className="relative flex-shrink-0 w-40 md:w-56 group snap-start">
+                <div key={movie.id} className="relative flex-shrink-0 w-36 md:w-48 group">
                   <SmartMovieCard
                     movie={movie}
                     userId={user.id}

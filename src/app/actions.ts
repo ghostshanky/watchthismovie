@@ -58,6 +58,30 @@ const checkKey = () => {
 };
 
 // -----------------------------------------------------------------------------
+// 0. TRAILER HELPER (New)
+// -----------------------------------------------------------------------------
+export async function fetchMovieTrailer(movieId: number) {
+  checkKey();
+  try {
+    const res = await fetch(
+      `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_KEY}&language=en-US`,
+      { next: { revalidate: 3600 } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const videos = data.results || [];
+    // Prioritize "Trailer" from YouTube, fallback to "Teaser"
+    const trailer = videos.find((v: any) => v.site === 'YouTube' && v.type === 'Trailer')
+      || videos.find((v: any) => v.site === 'YouTube');
+
+    return trailer ? trailer.key : null;
+  } catch (e) {
+    console.error("Trailer Fetch Error:", e);
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
 // 1. DASHBOARD ACTIONS
 // -----------------------------------------------------------------------------
 
@@ -96,7 +120,7 @@ export async function searchMovies(query: string) {
 // 1.1 DYNAMIC DISCOVERY ACTIONS
 // -----------------------------------------------------------------------------
 
-// 1. FETCH INITIAL BATCH (Exclude what we've seen)
+// 1. FETCH INITIAL BATCH (Iterative "Most Voted" Strategy)
 export async function fetchInitialBatch(userId: string) {
   checkKey();
   const cookieStore = await cookies();
@@ -106,7 +130,7 @@ export async function fetchInitialBatch(userId: string) {
     { cookies: { getAll() { return cookieStore.getAll() } } }
   );
 
-  // 1. Get ALL IDs as STRINGS to be safe
+  // 1. Get ALL IDs (seen/skipped)
   const { data: seen } = await supabase
     .from('user_interactions')
     .select('movie_id')
@@ -114,20 +138,49 @@ export async function fetchInitialBatch(userId: string) {
 
   const seenIds = new Set(seen?.map(x => String(x.movie_id)) || []);
 
-  // 2. Fetch Trending (Get 2 pages to ensure we have enough fresh movies)
-  const res1 = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US&page=1`);
-  const data1 = await res1.json();
+  const today = new Date().toISOString().split('T')[0];
+  let accumulatedMovies: TMDBMovie[] = [];
+  let page = 1;
+  const MAX_PAGES = 5; // Search up to top 100 movies (20 per page * 5)
 
-  const res2 = await fetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US&page=2`);
-  const data2 = await res2.json();
+  // 2. ITERATIVE LOOP: Keep fetching until we have enough new movies
+  while (accumulatedMovies.length < 10 && page <= MAX_PAGES) {
+    try {
+      console.log(`🔄 Fetching Top Voted Page ${page}...`);
 
-  const allMovies = [...(data1.results || []), ...(data2.results || [])] as TMDBMovie[];
+      const res = await fetch(
+        `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=vote_count.desc&vote_count.gte=300&include_adult=false&page=${page}`,
+        { next: { revalidate: 3600 } }
+      );
 
-  // 3. STRICT FILTER (String vs String)
-  // If Interstellar (id: 157336) is in seenIds ("157336"), it WILL be removed.
-  const freshMovies = allMovies.filter(m => !seenIds.has(String(m.id)));
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
 
-  return freshMovies.slice(0, 5);
+      const data = await res.json();
+      const results = (data.results as TMDBMovie[]) || [];
+
+      // Filter this page
+      const validMovies = results.filter(m => {
+        // A. Seen Check
+        if (seenIds.has(String(m.id))) return false;
+        // B. Future Date Check
+        if (!m.release_date || m.release_date > today) return false;
+        // C. Duplicate Check (Already in our accumulator)
+        if (accumulatedMovies.find(existing => existing.id === m.id)) return false;
+
+        return true;
+      });
+
+      accumulatedMovies = [...accumulatedMovies, ...validMovies];
+      page++;
+
+    } catch (error) {
+      console.error(`⚠️ Iterative Fetch Failed (Page ${page}):`, error);
+      break; // Stop loop on error to prevent infinite spin
+    }
+  }
+
+  // 3. Return what we found (Slice to 10 to keep batch size consistent)
+  return accumulatedMovies.slice(0, 10);
 }
 
 // 2. THE "BRAIN": Save Rating & Get Next Suggestions

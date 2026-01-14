@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Image from 'next/image';
 import { getMovieDetails } from '@/app/actions';
-import { PlayCircle, Star, Clock, Calendar, ChevronLeft, Eye, Check, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { PlayCircle, Star, Clock, Calendar, ChevronLeft, Eye, Check, ThumbsUp, ThumbsDown, Tv } from 'lucide-react';
 import Link from 'next/link';
 import WatchlistButton from '@/components/WatchlistButton';
 import RatingSlider from '@/components/RatingSlider';
@@ -34,6 +34,12 @@ interface SimilarMovie {
   vote_average: number;
 }
 
+interface Provider {
+  provider_id: number;
+  provider_name: string;
+  logo_path: string;
+}
+
 interface MovieDetails {
   id: number;
   title: string;
@@ -49,6 +55,7 @@ interface MovieDetails {
   };
   videos: Video[];
   similar: SimilarMovie[];
+  providers: Provider[];
 }
 
 // Helper to format minutes
@@ -190,16 +197,21 @@ export default async function MovieDetailsPage({
           </div>
 
           {/* ACTION BUTTONS */}
-          <div className="flex flex-col sm:flex-row items-center gap-4 pt-6 w-full sm:w-auto">
+          <div className="flex flex-row items-center gap-6 pt-6 w-full overflow-x-auto no-scrollbar">
 
-            {/* SLIDER (Takes full width on mobile) */}
+            {/* 1. SLIDER (Compact Width) */}
             {!isSeen && (
-              <div className="w-full sm:w-auto">
-                <RatingSlider movie={movie} userId={user?.id || ''} />
+              <div className="shrink-0 w-[140px]">
+                <RatingSlider
+                  movie={movie}
+                  userId={user?.id || ''}
+                  variant="mini" // Use mini variant to save space
+                />
               </div>
             )}
 
-            {/* WATCHLIST (Standard Button) */}
+            {/* 2. WATCHLIST (Icon Only on Mobile to save space?) */}
+            {/* keeping standard button but ensuring flex fit */}
             {!isSeen && (
               <div className="shrink-0">
                 <WatchlistButton
@@ -218,17 +230,16 @@ export default async function MovieDetailsPage({
               </div>
             )}
 
-            {/* TRAILER (Standard Button) */}
+            {/* 3. WATCH TRAILER (Elongated Button) */}
             {trailer && (
               <a
-                href={`https://www.youtube.com/results?search_query=${movie.title}+trailer`}
-                target="_blank"
-                rel="noreferrer"
-                className="shrink-0 px-8 py-4 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform flex items-center justify-center gap-2 shadow-lg w-full sm:w-auto"
+                href="#trailer"
+                className="shrink-0 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-red-900/30 transition-all flex items-center gap-2"
               >
                 <PlayCircle className="w-5 h-5" /> Watch Trailer
               </a>
             )}
+
           </div>
         </div>
       </div>
@@ -237,6 +248,8 @@ export default async function MovieDetailsPage({
       <div className="max-w-7xl mx-auto px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-12">
 
         <div className="md:col-span-2 space-y-12">
+
+          {/* PLOT */}
           <section>
             <h3 className="text-xl font-bold mb-4 text-white">The Plot</h3>
             <p className="text-gray-400 text-lg leading-relaxed">
@@ -244,10 +257,33 @@ export default async function MovieDetailsPage({
             </p>
           </section>
 
+          {/* WHERE TO WATCH (New) */}
+          {movie.providers && movie.providers.length > 0 && (
+            <section>
+              <h3 className="text-xl font-bold mb-6 text-white flex items-center gap-2">
+                <Tv className="w-5 h-5 text-purple-400" /> Where to Watch
+              </h3>
+              <div className="flex items-center gap-4 flex-wrap">
+                {movie.providers.map((p) => (
+                  <div key={p.provider_id} className="relative w-12 h-12 rounded-xl overflow-hidden border border-white/10" title={p.provider_name}>
+                    <Image
+                      src={`https://image.tmdb.org/t/p/original${p.logo_path}`}
+                      alt={p.provider_name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+                <div className="text-xs text-gray-500 ml-2">Stream now</div>
+              </div>
+            </section>
+          )}
+
+
           {/* CAST (Using Premium Scrollbar) */}
           <section>
             <h3 className="text-xl font-bold mb-6 text-white">Top Cast</h3>
-            <div className="flex gap-4 premium-scrollbar pb-4">
+            <div className="flex gap-4 premium-scrollbar pb-4 overflow-x-auto">
               {(movie.credits?.cast || []).slice(0, 8).map((actor) => (
                 <div key={actor.id} className="flex-shrink-0 w-32 space-y-2 group cursor-pointer">
                   <div className="relative w-32 h-32 rounded-full overflow-hidden border-2 border-transparent group-hover:border-blue-500 transition-colors bg-gray-800">
@@ -272,7 +308,7 @@ export default async function MovieDetailsPage({
           </section>
 
           {trailer && (
-            <section id="trailer" className="pt-8">
+            <section id="trailer" className="pt-8 scroll-mt-24">
               <h3 className="text-xl font-bold mb-6 text-white">Official Trailer</h3>
               <div className="relative aspect-video w-full bg-gray-900 rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
                 <iframe

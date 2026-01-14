@@ -1,14 +1,16 @@
 'use client';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Sparkles, Shield, Zap, ArrowRight, PlayCircle, CheckCircle, Film } from 'lucide-react';
+import { Sparkles, Shield, Zap, ArrowRight, Info, CheckCircle, Film, PlayCircle, X } from 'lucide-react';
 import { Movie } from '@/app/types';
 import { useEffect, useState } from 'react';
-import { fetchTrendingMovies } from '@/app/actions';
+import { fetchTrendingMovies, fetchMovieTrailer } from '@/app/actions';
 
 export default function LandingGuest() {
     // Client-side fetch for the background to avoid Server Component conflicts in this specific setup
     const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
+    const [trailerKey, setTrailerKey] = useState<string | null>(null);
+    const [isTrailerOpen, setIsTrailerOpen] = useState(false);
 
     useEffect(() => {
         const loadTrending = async () => {
@@ -19,6 +21,26 @@ export default function LandingGuest() {
         };
         loadTrending();
     }, []);
+
+    const handleWatchTrailer = async () => {
+        if (!heroMovie) return;
+
+        // If we already have the key, just open
+        if (trailerKey) {
+            setIsTrailerOpen(true);
+            return;
+        }
+
+        // Fetch
+        const key = await fetchMovieTrailer(heroMovie.id);
+        if (key) {
+            setTrailerKey(key);
+            setIsTrailerOpen(true);
+        } else {
+            console.warn("No trailer found");
+            // Optionally show a toast here
+        }
+    };
 
     return (
         <div className="min-h-screen w-full bg-black text-white selection:bg-blue-500/30 overflow-x-hidden">
@@ -69,6 +91,7 @@ export default function LandingGuest() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-col md:flex-row gap-4 max-w-lg">
+                        {/* 1. Primary Action */}
                         <Link
                             href="/login"
                             className="px-8 py-4 bg-white text-black font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-[0_0_30px_-5px_rgba(255,255,255,0.4)]"
@@ -76,15 +99,24 @@ export default function LandingGuest() {
                             Check My Match Score <ArrowRight className="w-5 h-5" />
                         </Link>
 
+                        {/* 2. Embedded Trailer (Elongated Pill) */}
                         {heroMovie && (
-                            <a
-                                href={`https://www.youtube.com/results?search_query=${heroMovie.title}+trailer`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="px-8 py-4 bg-black/40 backdrop-blur-md border border-white/20 text-white font-bold text-lg rounded-full hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            <button
+                                onClick={handleWatchTrailer}
+                                className="px-8 py-4 bg-red-600/90 text-white font-bold text-lg rounded-full hover:bg-red-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
                             >
                                 <PlayCircle className="w-5 h-5" /> Watch Trailer
-                            </a>
+                            </button>
+                        )}
+
+                        {/* 3. Info Link (Glass) */}
+                        {heroMovie && (
+                            <Link
+                                href={`/movie/${heroMovie.id}`}
+                                className="px-8 py-4 bg-black/40 backdrop-blur-md border border-white/20 text-white font-bold text-lg rounded-full hover:bg-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                <Info className="w-5 h-5" /> Info
+                            </Link>
                         )}
                     </div>
 
@@ -99,6 +131,29 @@ export default function LandingGuest() {
                     </div>
                 </div>
             </section>
+
+            {/* TRAILER MODAL OVERLAY */}
+            {isTrailerOpen && trailerKey && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-in fade-in duration-300">
+                    <button
+                        onClick={() => setIsTrailerOpen(false)}
+                        className="absolute top-6 right-6 p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"
+                    >
+                        <X className="w-8 h-8 text-white" />
+                    </button>
+
+                    <div className="w-full max-w-5xl aspect-video rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black">
+                        <iframe
+                            className="w-full h-full"
+                            src={`https://www.youtube.com/embed/${trailerKey}?autoplay=1&rel=0`}
+                            title="Movie Trailer"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        />
+                    </div>
+                </div>
+            )}
+
 
             {/* =========================================
           SOCIAL PROOF
