@@ -115,10 +115,13 @@ export default function Navigation() {
   }, [mobileQuery]);
 
   const confirmSignOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setAvatarUrl(null);
+    // 1. Server-Side Sign Out (Clears Cookies properly)
+    const { signOutAction } = await import('@/app/actions');
+    await signOutAction();
+
+    // 2. Navigate
     router.push('/login');
+    router.refresh(); // Hard refresh to clear cached layouts
     setShowSignOutModal(false);
   };
 
