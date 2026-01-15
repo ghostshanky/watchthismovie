@@ -6,17 +6,17 @@ export default function Footer() {
   return (
     <footer className="w-full bg-black border-t border-white/10 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-        
+
         {/* Brand Column */}
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             {/* NEW LOGO HERE */}
             <div className="w-8 h-8 relative">
-              <Image 
-                 src="/wtm.svg" 
-                 alt="WatchThisMovie" 
-                 fill 
-                 className="rounded object-contain" 
+              <Image
+                src="/wtm.svg"
+                alt="WatchThisMovie"
+                fill
+                className="rounded object-contain"
               />
             </div>
             <span className="font-bold text-white">WatchThisMovie</span>
@@ -27,7 +27,7 @@ export default function Footer() {
         </div>
 
         {/* ... (Keep the rest of your links exactly the same) ... */}
-        
+
         {/* Links Column 1 */}
         <div>
           <h4 className="font-bold text-white mb-4">Product</h4>
@@ -41,8 +41,9 @@ export default function Footer() {
         <div>
           <h4 className="font-bold text-white mb-4">Company</h4>
           <ul className="space-y-2 text-sm text-gray-500">
-            <li><Link href="#" className="hover:text-blue-400">About Us</Link></li>
-            <li><Link href="#" className="hover:text-blue-400">Privacy Policy</Link></li>
+            <li><Link href="/about" className="hover:text-blue-400">About Us</Link></li>
+            <li><Link href="/privacy" className="hover:text-blue-400">Privacy Policy</Link></li>
+            <li><Link href="/terms" className="hover:text-blue-400">Terms of Service</Link></li>
           </ul>
         </div>
 
