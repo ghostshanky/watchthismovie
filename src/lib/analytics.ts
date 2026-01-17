@@ -4,6 +4,7 @@ export interface AnalyticsData {
     sentiment: {
         likes: number;
         dislikes: number;
+        skipped: number; // New "Neutral"
         total: number;
     };
     activity: {
@@ -22,14 +23,17 @@ export async function getUserAnalytics(userId: string, supabase: SupabaseClient)
     if (error || !interactions) {
         console.error("Analytics fetch error:", error);
         return {
-            sentiment: { likes: 0, dislikes: 0, total: 0 },
+            sentiment: { likes: 0, dislikes: 0, skipped: 0, total: 0 },
             activity: []
         };
     }
 
-    // 2. Sentiment Analysis
+    // 2. Sentiment Analysis (Strict)
     const likes = interactions.filter(i => i.liked === true).length;
-    const dislikes = interactions.filter(i => i.liked === false).length;
+    // Dislike = Explicitly Disliked AND Watched (Skipped doesn't count as dislike anymore)
+    const dislikes = interactions.filter(i => i.liked === false && i.has_watched === true).length;
+    // Skipped = Has Not Watched
+    const skipped = interactions.filter(i => i.has_watched === false).length;
 
     // 3. Activity Analysis (Last 6 Months)
     const activityMap = new Map<string, number>();
@@ -65,7 +69,8 @@ export async function getUserAnalytics(userId: string, supabase: SupabaseClient)
         sentiment: {
             likes,
             dislikes,
-            total: likes + dislikes
+            skipped,
+            total: likes + dislikes + skipped
         },
         activity
     };

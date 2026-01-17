@@ -120,7 +120,7 @@ export async function searchMovies(query: string) {
 // 1.1 DYNAMIC DISCOVERY ACTIONS
 // -----------------------------------------------------------------------------
 
-// 1. FETCH INITIAL BATCH (Iterative "Most Voted" Strategy)
+// 1. FETCH INITIAL BATCH (Mainstream Popularity Strategy)
 export async function fetchInitialBatch(userId: string) {
   checkKey();
   const cookieStore = await cookies();
@@ -130,81 +130,118 @@ export async function fetchInitialBatch(userId: string) {
     { cookies: { getAll() { return cookieStore.getAll() } } }
   );
 
-  // Helper: Robust Fetch with Retries to prevent "fetch failed"
+  // Helper: Robust Fetch
   const robustFetch = async (url: string, retries = 3) => {
     for (let i = 0; i < retries; i++) {
       try {
         const res = await fetch(url, {
           headers: { 'Accept': 'application/json', 'User-Agent': 'WatchThisMovie/1.0' },
-          next: { revalidate: 3600 }
+          next: { revalidate: 0 } // Cache Disabled for Freshness
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
         return await res.json();
       } catch (err: any) {
-        console.warn(`⚠️ Attempt ${i + 1} failed for ${url.split('?')[0]}: ${err.message}`);
+        console.warn(`⚠️ Attempt ${i + 1} failed: ${err.message}`);
         if (i === retries - 1) return null;
-        await new Promise(r => setTimeout(r, 1000)); // Wait 1s
+        await new Promise(r => setTimeout(r, 1000));
       }
     }
     return null;
   };
 
-  // 1. Get ALL IDs (seen/skipped)
-  const { data: seen } = await supabase
-    .from('user_interactions')
-    .select('movie_id')
-    .eq('user_id', userId);
+  // Helper: Shuffle Array
+  const shuffle = <T>(array: T[]) => {
+    let currentIndex = array.length, randomIndex;
+    while (currentIndex != 0) {
+      randomIndex = Math.floor(Math.random() * currentIndex);
+      currentIndex--;
+      [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+    }
+    return array;
+  };
 
+  // 1. Get User Region
+  const countryCode = await getCountryCode() || 'US';
+  console.log(`🌍 User Region: ${countryCode}`);
+
+  // 2. Get Seen Movies
+  const { data: seen } = await supabase.from('user_interactions').select('movie_id').eq('user_id', userId);
   const seenIds = new Set(seen?.map(x => String(x.movie_id)) || []);
 
-  const today = new Date().toISOString().split('T')[0];
   let accumulatedMovies: TMDBMovie[] = [];
-  let page = 1;
-  const MAX_PAGES = 5;
 
-  // 2. ITERATIVE LOOP
-  while (accumulatedMovies.length < 10 && page <= MAX_PAGES) {
-    console.log(`🔄 Fetching Top Voted Page ${page}...`);
+  // 3. MAIN LOOP: "Famous & Local" (Randomized Start)
+  // Instead of starting at page 1, we start at a random page between 1 and 10.
+  // This ensures we get different "Famous" movies every time.
+  let page = Math.floor(Math.random() * 8) + 1; // Random Page 1-8
+  const MAX_ITERATIONS = 5;
+  let iterations = 0;
+
+  while (accumulatedMovies.length < 10 && iterations < MAX_ITERATIONS) {
+    console.log(`🔄 Fetching Famous Page ${page} for ${countryCode}...`);
+
+    // We prioritize "Famous" (vote count) over "Trending" (popularity) to avoid "Viral ticks" the user doesn't know.
     const data = await robustFetch(
-      `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=vote_count.desc&vote_count.gte=300&include_adult=false&page=${page}`
+      `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=vote_count.desc&vote_count.gte=3000&include_adult=false&include_video=false&page=${page}&region=${countryCode}&with_release_type=2|3`
     );
 
     if (data && data.results) {
-      const results = (data.results as TMDBMovie[]) || [];
+      let results = (data.results as TMDBMovie[]) || [];
+
+      // Shuffle the page results so even the same page looks different
+      results = shuffle(results);
+
       const validMovies = results.filter(m => {
         if (seenIds.has(String(m.id))) return false;
-        if (!m.release_date || m.release_date > today) return false;
-        if (accumulatedMovies.find(existing => existing.id === m.id)) return false;
+        // No need for poster check, >3000 votes guarantees high quality metadata
+        if (accumulatedMovies.find(e => e.id === m.id)) return false;
         return true;
       });
       accumulatedMovies = [...accumulatedMovies, ...validMovies];
     }
-    page++;
+    page++; // Move to next page
+    iterations++;
   }
 
-  // 3. FALLBACK: Trending
+  // 4. FALLBACK: Global Blockbusters (Randomized)
   if (accumulatedMovies.length < 5) {
-    console.log("⚠️ Initial Batch Low... Attempting Trending Fallback");
+    console.log("⚠️ Region Famous Low... Fetching Global Blockbusters");
+    const randPage = Math.floor(Math.random() * 5) + 1;
+    const data = await robustFetch(
+      `${TMDB_BASE_URL}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=vote_count.desc&vote_count.gte=5000&include_adult=false&page=${randPage}`
+    );
+    if (data && data.results) {
+      let fresh = (data.results as TMDBMovie[]).filter(m =>
+        !seenIds.has(String(m.id)) && !accumulatedMovies.some(e => e.id === m.id)
+      );
+      fresh = shuffle(fresh); // Shuffle fallback too
+      accumulatedMovies = [...accumulatedMovies, ...fresh];
+    }
+  }
+
+  // 5. LAST RESORT: Trending (Hype)
+  if (accumulatedMovies.length < 5) {
+    console.log("⚠️ Fetching Trending Fallback");
     const data = await robustFetch(`${TMDB_BASE_URL}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US`);
     if (data && data.results) {
-      const fresh = (data.results as TMDBMovie[]).filter(m =>
+      let fresh = (data.results as TMDBMovie[]).filter(m =>
         !seenIds.has(String(m.id)) && !accumulatedMovies.some(e => e.id === m.id)
       );
+      fresh = shuffle(fresh);
       accumulatedMovies = [...accumulatedMovies, ...fresh];
     }
   }
 
-  // 4. SECOND FALLBACK: Top Rated
-  if (accumulatedMovies.length < 5) {
-    console.log("⚠️ Initial Batch Still Low... Attempting Top Rated Fallback");
+  // 6. FORCE FILL
+  if (accumulatedMovies.length === 0) {
     const data = await robustFetch(`${TMDB_BASE_URL}/movie/top_rated?api_key=${TMDB_KEY}&language=en-US&page=1`);
     if (data && data.results) {
-      const fresh = (data.results as TMDBMovie[]).filter(m =>
-        !seenIds.has(String(m.id)) && !accumulatedMovies.some(e => e.id === m.id)
-      );
-      accumulatedMovies = [...accumulatedMovies, ...fresh];
+      accumulatedMovies = shuffle(data.results).slice(0, 10);
     }
   }
+
+  // Final Shuffle of the entire batch for good measure
+  accumulatedMovies = shuffle(accumulatedMovies);
 
   console.log(`✅ Initial Batch Size: ${accumulatedMovies.length}`);
   return accumulatedMovies.slice(0, 10);

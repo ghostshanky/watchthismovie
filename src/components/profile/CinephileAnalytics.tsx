@@ -10,10 +10,35 @@ export default function CinephileAnalytics({ data }: { data: AnalyticsData }) {
     const maxActivity = Math.max(...data.activity.map(a => a.count), 5); // Minimum scale of 5
 
     // Donut Chart Calculations
-    const total = data.sentiment.total;
-    const likePct = total > 0 ? (data.sentiment.likes / total) * 100 : 0;
+    // Donut Chart Calculations
+    const { likes, dislikes, skipped, total } = data.sentiment;
+
+    // Percentages
+    const likePct = total > 0 ? (likes / total) * 100 : 0;
+    const dislikePct = total > 0 ? (dislikes / total) * 100 : 0;
+    // Skipped is the remainder, or base
+
     const circumference = 2 * Math.PI * 40; // r=40
-    const likeOffset = circumference - (likePct / 100) * circumference;
+
+    // Calculate Offsets for SVG Stroke Dasharray
+    // We stack them: Base (Gray) -> Dislike (Red) -> Like (Green)
+
+    // Green (Likes)
+    const likeStroke = (likePct / 100) * circumference;
+    const likeOffset = circumference - likeStroke;
+
+    // Red (Dislikes) - Starts where Green ends? No, let's rotate them.
+    // Easier: 
+    // Circle 1: Gray (Full)
+    // Circle 2: Red (Starts at 0). Length = Dislike Pct.
+    // Circle 3: Green (Starts at Dislike End). Length = Like Pct.
+
+    const dislikeStroke = (dislikePct / 100) * circumference;
+    const dislikeOffset = circumference - dislikeStroke;
+
+    // Rotation for Green segment (starts after Red)
+    // Red takes up (dislikePct/100) * 360 degrees
+    const greenRotation = (dislikePct / 100) * 360 - 90; // -90 to compensate for initial SVG rotation
 
     return (
         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8 mb-20">
@@ -27,9 +52,9 @@ export default function CinephileAnalytics({ data }: { data: AnalyticsData }) {
 
                 <div className="flex items-end justify-between h-40 pt-4">
                     {data.activity.map((item, idx) => (
-                        <div key={idx} className="flex flex-col items-center gap-2 w-full">
-                            {/* Bar */}
-                            <div className="w-full px-1 h-full flex items-end justify-center group">
+                        <div key={idx} className="flex flex-col items-center gap-2 w-full h-full justify-end">
+                            {/* Bar Container - flex-1 takes available space above label */}
+                            <div className="w-full px-1 flex-1 flex items-end justify-center group relative">
                                 <motion.div
                                     initial={{ height: 0 }}
                                     whileInView={{ height: `${(item.count / maxActivity) * 100}%` }}
@@ -58,25 +83,41 @@ export default function CinephileAnalytics({ data }: { data: AnalyticsData }) {
 
                 <div className="relative w-48 h-48">
                     {/* SVG Donut */}
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-                        {/* Background Circle (Dislikes) */}
+                    <svg className="w-full h-full" viewBox="0 0 100 100">
+                        {/* 1. Base Circle (Neutral/Skipped) - Gray */}
                         <circle
+                            cx="50" cy="50" r="40"
+                            fill="transparent"
+                            stroke="#374151" // Gray-700
+                            strokeWidth="10"
+                        />
+
+                        {/* 2. Dislikes (Red) - Starts at -90deg (Top) */}
+                        <motion.circle
                             cx="50" cy="50" r="40"
                             fill="transparent"
                             stroke="#ef4444" // Red-500
                             strokeWidth="10"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={circumference} // Initial
+                            whileInView={{ strokeDashoffset: dislikeOffset }}
+                            transition={{ duration: 1, ease: "easeOut" }}
+                            strokeLinecap="round"
+                            transform="rotate(-90 50 50)"
                         />
-                        {/* Foreground Circle (Likes) */}
+
+                        {/* 3. Likes (Green) - Starts after Red */}
                         <motion.circle
                             cx="50" cy="50" r="40"
                             fill="transparent"
                             stroke="#22c55e" // Green-500
                             strokeWidth="10"
                             strokeDasharray={circumference}
-                            strokeDashoffset={circumference} // Start full offset (empty)
+                            strokeDashoffset={circumference} // Initial
                             whileInView={{ strokeDashoffset: likeOffset }}
-                            transition={{ duration: 1.5, ease: "easeOut" }}
+                            transition={{ duration: 1, ease: "easeOut", delay: 0.5 }}
                             strokeLinecap="round"
+                            transform={`rotate(${greenRotation} 50 50)`}
                         />
                     </svg>
 
@@ -88,14 +129,18 @@ export default function CinephileAnalytics({ data }: { data: AnalyticsData }) {
                 </div>
 
                 {/* Legend */}
-                <div className="flex gap-6 mt-6">
+                <div className="flex flex-wrap justify-center gap-4 mt-6">
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-green-500" />
-                        <span className="text-sm text-gray-400">{data.sentiment.likes} Liked</span>
+                        <span className="text-xs text-gray-400 font-bold">{likes} Positive</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-gray-700" />
+                        <span className="text-xs text-gray-400 font-bold">{skipped} Neutral</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-500" />
-                        <span className="text-sm text-gray-400">{data.sentiment.dislikes} Disliked</span>
+                        <span className="text-xs text-gray-400 font-bold">{dislikes} Negative</span>
                     </div>
                 </div>
             </div>

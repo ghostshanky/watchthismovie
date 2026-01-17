@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { submitRatingAndGetNext } from '@/app/actions';
-import { X, Check, EyeOff, Star, Loader2 } from 'lucide-react';
+import { X, Check, EyeOff, Star, Loader2, Info } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import RatingSlider from '@/components/RatingSlider';
 import { Movie } from '@/app/types';
@@ -139,6 +139,18 @@ export default function DashboardInteractions({
                             <div className="flex items-center justify-center h-full text-gray-500">No Image</div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+
+                        {/* INFO BUTTON (New) */}
+                        <button
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                window.location.href = `/movie/${currentMovie.id}`;
+                            }}
+                            className="absolute top-4 right-4 z-20 p-2.5 bg-black/40 backdrop-blur-md rounded-full text-white/80 border border-white/10 hover:bg-white hover:text-black hover:scale-105 transition-all"
+                        >
+                            <Info className="w-5 h-5" />
+                        </button>
                     </div>
 
                     {/* CONTROLS */}
