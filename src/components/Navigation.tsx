@@ -179,6 +179,7 @@ export default function Navigation() {
                   <button
                     onClick={() => setProfileOpen(!profileOpen)}
                     className="w-9 h-9 rounded-full overflow-hidden border border-white/20 hover:border-white transition-colors focus:outline-none"
+                    aria-label="Open User Menu"
                   >
                     {avatarUrl ? (
                       <Image src={avatarUrl} alt="User" width={36} height={36} className="object-cover" />
@@ -244,6 +245,7 @@ export default function Navigation() {
             <button
               className="md:hidden text-white"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle Mobile Menu"
             >
               {mobileMenuOpen ? <X /> : <Menu />}
             </button>
