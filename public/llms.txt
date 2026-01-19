@@ -1,0 +1,25 @@
+# WatchThisMovie
+
+> Stop scrolling. Start watching. The AI-powered recommendation engine that knows your taste better than you do.
+
+## About
+WatchThisMovie is a movie discovery platform that uses a unique algorithm to help users find movies they will actually love, rather than just popular hits. It learns from user interactions (likes, dislikes, skips) to build a "Taste DNA" profile.
+
+## Key Features
+- **Smart Queue**: An endless feed of recommendations that adapts in real-time.
+- **Taste DNA**: Visual analytics of your genre preferences and watching habits.
+- **Privacy First**: We respect user data and do not sell it.
+
+## Routes
+- `/`: Landing Page
+- `/rate`: The core rating interface.
+- `/results`: View your personalized recommendations.
+- `/watchlist`: Your saved movies.
+- `/profile`: User settings and stats.
+- `/cinephile/[username]`: Public profile to share your taste.
+
+## API Usage
+This site does not currently offer a public API for agents.
+
+## Contact
+For inquiries, please contact the maintainers via the GitHub repository or the social links on the footer.
