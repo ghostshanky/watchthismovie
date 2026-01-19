@@ -25,6 +25,7 @@ export default function RemoveFromWatchlist({ movieId }: { movieId: number }) {
             disabled={loading}
             className="p-2 bg-black/60 backdrop-blur-md text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-colors shadow-lg"
             title="Remove from Watchlist"
+            aria-label="Remove from Watchlist"
         >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
         </button>

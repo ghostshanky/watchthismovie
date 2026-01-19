@@ -38,7 +38,7 @@ export default async function LibraryPage() {
           </div>
           <div>
             <h1 className="text-3xl font-bold">Your Watchlist</h1>
-            <p className="text-gray-400 text-sm">{movies?.length || 0} movies saved for later</p>
+            <p className="text-gray-300 text-sm">{movies?.length || 0} movies saved for later</p>
           </div>
         </div>
 
@@ -55,6 +55,7 @@ export default async function LibraryPage() {
                       src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
                       alt={movie.title || 'Movie'}
                       fill
+                      sizes="(max-width: 768px) 50vw, (max-width: 1200px) 25vw, 20vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
@@ -69,9 +70,9 @@ export default async function LibraryPage() {
                 </Link>
 
                 {/* Title */}
-                <h3 className="mt-3 font-bold text-sm truncate text-gray-300 group-hover:text-white transition-colors">
+                <h2 className="mt-3 font-bold text-sm truncate text-gray-300 group-hover:text-white transition-colors">
                   {movie.title}
-                </h3>
+                </h2>
 
                 {/* Remove Button */}
                 <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">

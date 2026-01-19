@@ -60,7 +60,7 @@ export default function LandingUser({ user, bestMatch }: { user: User, bestMatch
               <span>{bestMatch.release_date?.split('-')[0]}</span>
             </div>
 
-            <p className="text-gray-300 line-clamp-3 md:line-clamp-4 max-w-xl text-sm md:text-lg leading-relaxed drop-shadow-md">
+            <p className="text-gray-200 line-clamp-3 md:line-clamp-4 max-w-xl text-sm md:text-lg leading-relaxed drop-shadow-md">
               {bestMatch.overview}
             </p>
 
@@ -117,6 +117,7 @@ export default function LandingUser({ user, bestMatch }: { user: User, bestMatch
                 src={`https://image.tmdb.org/t/p/w500${bestMatch.poster_path}`}
                 alt={bestMatch.title}
                 fill
+                sizes="(max-width: 768px) 100vw, 300px"
                 className="object-cover"
               />
             </div>

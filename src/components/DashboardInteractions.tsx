@@ -148,6 +148,7 @@ export default function DashboardInteractions({
                                 window.location.href = `/movie/${currentMovie.id}`;
                             }}
                             className="absolute top-4 right-4 z-20 p-2.5 bg-black/40 backdrop-blur-md rounded-full text-white/80 border border-white/10 hover:bg-white hover:text-black hover:scale-105 transition-all"
+                            aria-label="View Movie Details"
                         >
                             <Info className="w-5 h-5" />
                         </button>
