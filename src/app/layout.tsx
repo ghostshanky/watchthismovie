@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     icon: '/wtm.svg',
   },
   verification: {
-    google: 'TQpT07Te-H5Nugym8M4WCC3MsgEGFUzjv_3NQuCrjjI',
+    google: 'V1txDMkKDMg-_zL3D8fmW5SYM-ftq2O85qfTWLT-5ho',
   },
 };
 
