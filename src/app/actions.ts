@@ -236,7 +236,7 @@ export async function fetchInitialBatch(userId: string) {
   if (accumulatedMovies.length === 0) {
     const data = await robustFetch(`${TMDB_BASE_URL}/movie/top_rated?api_key=${TMDB_KEY}&language=en-US&page=1`);
     if (data && data.results) {
-      accumulatedMovies = shuffle(data.results).slice(0, 10);
+      accumulatedMovies = shuffle(data.results as TMDBMovie[]).slice(0, 10);
     }
   }
 
