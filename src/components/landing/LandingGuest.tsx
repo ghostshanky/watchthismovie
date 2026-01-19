@@ -6,21 +6,14 @@ import { Movie } from '@/app/types';
 import { useEffect, useState } from 'react';
 import { fetchTrendingMovies, fetchMovieTrailer } from '@/app/actions';
 
-export default function LandingGuest() {
-    // Client-side fetch for the background to avoid Server Component conflicts in this specific setup
-    const [heroMovie, setHeroMovie] = useState<Movie | null>(null);
+export default function LandingGuest({ initialHeroMovie }: { initialHeroMovie: Movie | null }) {
+    // initialize state with server data (fast LCP)
+    const [heroMovie, setHeroMovie] = useState<Movie | null>(initialHeroMovie);
     const [trailerKey, setTrailerKey] = useState<string | null>(null);
     const [isTrailerOpen, setIsTrailerOpen] = useState(false);
 
-    useEffect(() => {
-        const loadTrending = async () => {
-            try {
-                const movies = await fetchTrendingMovies();
-                if (movies && movies.length > 0) setHeroMovie(movies[0] as unknown as Movie);
-            } catch (e) { console.error(e); }
-        };
-        loadTrending();
-    }, []);
+    // No useEffect needed for initial fetch anymore!
+
 
     const handleWatchTrailer = async () => {
         if (!heroMovie) return;

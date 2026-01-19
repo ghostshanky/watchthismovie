@@ -39,6 +39,8 @@ export default function RootLayout({
       <body className={`${inter.className} bg-black text-white antialiased`}>
         {/* Preconnect for Noise Texture */}
         <link rel="preconnect" href="https://grainy-gradients.vercel.app" />
+        {/* Preconnect for TMDB Images (LCP Optimization) */}
+        <link rel="preconnect" href="https://image.tmdb.org" />
 
         {/* Google Tag Manager (noscript) */}
         <noscript>

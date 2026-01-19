@@ -26,5 +26,9 @@ export default async function Page() {
     return <LandingUser user={user} bestMatch={bestMatch as any} />;
   }
 
-  return <LandingGuest />;
+  // GUEST FLOW: Fetch Trending for Hero (Server-Side for Fast LCP)
+  const trending = await fetchTrendingMovies();
+  const heroMovie = trending[0] || null;
+
+  return <LandingGuest initialHeroMovie={heroMovie as any} />;
 }
