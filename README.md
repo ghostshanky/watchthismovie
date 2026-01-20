@@ -1,4 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# watchthismovie
+
+> "Life is too short for bad movies."
+
+**watchthismovie** is an intelligent movie discovery platform that strips away the ads, tracking, and clutter to help you find cinema that actually moves you. 
+
+Instead of generic recommendations, our AI analyzes your psychology—mood, pacing, cinematography, and plot complexity—to predict your exact **Match Score** before you press play.
+
+![Hero Image](https://image.tmdb.org/t/p/original/mCorHovM3sO1PpwZ4M3gqfHkP94.jpg)
+
+## Features
+
+- **🧠 Psyche-Based AI Matching**  
+  We analyze deeper attributes like mood and pacing to find movies that resonate with your personality.
+
+- **⚡ Lightning Fast Discovery**  
+  Get a curated list of 20 movies in under 1.2 seconds. No more scrolling paralysis.
+
+- **🛡️ Privacy First**  
+  You are the customer, not the product. We never sell your viewing data to advertisers.
+
+- **🎯 Smart Filters**  
+  - Filter by Streaming Service (Netflix, Prime, etc.)
+  - Exclude genres you dislike (e.g., No Horror)
+
+## Tech Stack
+
+This project is built with a modern, high-performance stack:
+
+- **Framework:** [Next.js 15](https://nextjs.org/) (App Router)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Database/Auth:** [Supabase](https://supabase.com/)
+- **Animations:** [Framer Motion](https://www.framer.com/motion/)
+- **Icons:** [Lucide React](https://lucide.dev/)
+- **Media:** [ImageKit](https://imagekit.io/)
 
 ## Getting Started
 
@@ -16,22 +50,9 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
 
 - [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
 - [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# watchthismovie
