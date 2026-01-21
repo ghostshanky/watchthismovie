@@ -2,21 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   images: {
+    // This tells Next.js: "Don't use Vercel's server to resize. Just show the image."
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'image.tmdb.org',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'ik.imagekit.io',
-        pathname: '/**',
+        hostname: '**', // Allow images from Supabase/TMDB anywhere
       },
     ],
   },
